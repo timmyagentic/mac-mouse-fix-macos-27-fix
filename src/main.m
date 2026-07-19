@@ -4,7 +4,12 @@
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import <mach/mach_time.h>
+#import <libproc.h>
 #import <math.h>
+#import <pthread.h>
+#import <signal.h>
+#import <stdatomic.h>
+#import <unistd.h>
 
 // Private types are intentionally declared locally so the project builds with
 // the public macOS SDK. Mac Mouse Fix already relies on the same HID/SkyLight
@@ -61,9 +66,104 @@ static SLEventSetIOHIDEventFn gSetHIDEvent = NULL;
 static SLEventCopyIOHIDEventFn gCopyHIDEvent = NULL;
 static Class gHIDEventClass = Nil;
 static CFMachPortRef gEventTap = NULL;
-static CFRunLoopSourceRef gEventTapSource = NULL;
 static CFRunLoopRef gEventTapRunLoop = NULL;
-static uint64_t gPatchedEventCount = 0;
+static pthread_mutex_t gEventTapLock = PTHREAD_MUTEX_INITIALIZER;
+static _Atomic uint64_t gPatchedEventCount = 0;
+
+static NSString *const MMFAlwaysShowMenuBarIconKey = @"AlwaysShowMenuBarIcon";
+static NSString *const MMFShowMenuNotification = @"local.timmy.mmf27-dock-swipe-fix.show-menu";
+static NSString *const MMFRuntimeStatusFileName = @"runtime-status.txt";
+static NSString *const MMFRuntimePIDFileName = @"runtime-pid.txt";
+static NSString *const MMFMenuBarIconStatusFileName = @"menu-bar-icon.txt";
+static const NSTimeInterval MMFStartupRevealDuration = 3.0;
+static const NSTimeInterval MMFManualRevealDuration = 30.0;
+
+static NSString *MMFSupportDirectory(void) {
+    return [NSHomeDirectory() stringByAppendingPathComponent:
+        @"Library/Application Support/MMF27 Dock Swipe Fix"];
+}
+
+static NSString *MMFSupportFilePath(NSString *fileName) {
+    return [MMFSupportDirectory() stringByAppendingPathComponent:fileName];
+}
+
+static void MMFWriteSupportFile(NSString *fileName, NSString *contents) {
+    [NSFileManager.defaultManager createDirectoryAtPath:MMFSupportDirectory()
+                            withIntermediateDirectories:YES
+                                             attributes:nil
+                                                  error:nil];
+    [contents writeToFile:MMFSupportFilePath(fileName)
+               atomically:YES
+                 encoding:NSUTF8StringEncoding
+                    error:nil];
+}
+
+static NSString *MMFReadTrimmedSupportFile(NSString *fileName) {
+    NSString *contents = [NSString stringWithContentsOfFile:MMFSupportFilePath(fileName)
+                                                    encoding:NSUTF8StringEncoding
+                                                       error:nil];
+    return [contents stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
+
+static CFMachPortRef MMFCopyPublishedEventTap(void) {
+    pthread_mutex_lock(&gEventTapLock);
+    CFMachPortRef eventTap = gEventTap;
+    if (eventTap) CFRetain(eventTap);
+    pthread_mutex_unlock(&gEventTapLock);
+    return eventTap;
+}
+
+static CFRunLoopRef MMFCopyPublishedEventTapRunLoop(void) {
+    pthread_mutex_lock(&gEventTapLock);
+    CFRunLoopRef runLoop = gEventTapRunLoop;
+    if (runLoop) CFRetain(runLoop);
+    pthread_mutex_unlock(&gEventTapLock);
+    return runLoop;
+}
+
+static void MMFPublishEventTap(CFMachPortRef eventTap, CFRunLoopRef runLoop) {
+    pthread_mutex_lock(&gEventTapLock);
+    gEventTap = eventTap;
+    gEventTapRunLoop = runLoop;
+    pthread_mutex_unlock(&gEventTapLock);
+}
+
+static void MMFUnpublishEventTap(CFMachPortRef eventTap, CFRunLoopRef runLoop) {
+    pthread_mutex_lock(&gEventTapLock);
+    if (gEventTap == eventTap) gEventTap = NULL;
+    if (gEventTapRunLoop == runLoop) gEventTapRunLoop = NULL;
+    pthread_mutex_unlock(&gEventTapLock);
+}
+
+static void MMFStopPublishedEventTapRunLoop(void) {
+    CFRunLoopRef runLoop = MMFCopyPublishedEventTapRunLoop();
+    if (!runLoop) return;
+    CFRunLoopStop(runLoop);
+    CFRelease(runLoop);
+}
+
+static BOOL MMFShouldShowMenuBarIcon(NSString *runtimeCode,
+                                     BOOL alwaysShow,
+                                     BOOL startupReveal,
+                                     BOOL manualReveal,
+                                     BOOL menuOpen) {
+    BOOL healthy = [runtimeCode isEqualToString:@"active"];
+    return alwaysShow || startupReveal || manualReveal || menuOpen || !healthy;
+}
+
+static BOOL MMFRecordedRuntimeProcessIsAlive(void) {
+    pid_t recordedPID = (pid_t)MMFReadTrimmedSupportFile(MMFRuntimePIDFileName).intValue;
+    if (recordedPID <= 0 || recordedPID == getpid()) return NO;
+    if (kill(recordedPID, 0) != 0) return NO;
+
+    char processPath[PROC_PIDPATHINFO_MAXSIZE] = {0};
+    if (proc_pidpath(recordedPID, processPath, sizeof(processPath)) <= 0) return NO;
+    NSString *recordedPath = [[NSFileManager.defaultManager
+        stringWithFileSystemRepresentation:processPath
+                                    length:strlen(processPath)] stringByResolvingSymlinksInPath];
+    NSString *currentPath = [NSBundle.mainBundle.executablePath stringByResolvingSymlinksInPath];
+    return recordedPath.length > 0 && [recordedPath isEqualToString:currentPath];
+}
 
 static BOOL MMFIsMacOS27OrLater(void) {
     return NSProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27;
@@ -164,13 +264,13 @@ static BOOL MMFAttachDockSwipePayload(CGEventRef event) {
     }
 
     gSetHIDEvent(event, (__bridge CFTypeRef)hidEvent);
-    gPatchedEventCount += 1;
+    uint64_t patchedEventCount = atomic_fetch_add(&gPatchedEventCount, 1) + 1;
     if ((phase == MMFHIDEventPhaseEnded || phase == MMFHIDEventPhaseCancelled)
         && getenv("MMF27_VERBOSE_EVENTS") != NULL) {
         fprintf(stderr,
                 "[MMF27Fix] patched_event=%llu motion=%ld phase=%u inverted=%d "
                 "progress=%.5f velocity=(%.3f,%.3f)\n",
-                gPatchedEventCount,
+                patchedEventCount,
                 (long)motion,
                 phase,
                 inverted,
@@ -247,6 +347,35 @@ static BOOL MMFRunSelfTestCase(NSInteger motion,
     return valid;
 }
 
+static BOOL MMFRunMenuBarPolicySelfTest(void) {
+    BOOL valid = YES;
+    valid = valid && !MMFShouldShowMenuBarIcon(@"active", NO, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"active", YES, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"active", NO, YES, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"active", NO, NO, YES, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"active", NO, NO, NO, YES);
+    valid = valid && MMFShouldShowMenuBarIcon(nil, NO, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"starting", NO, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"waiting_accessibility", NO, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"waiting_event_tap", NO, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"error_private_api", NO, NO, NO, NO);
+    valid = valid && MMFShouldShowMenuBarIcon(@"inactive_wrong_os", NO, NO, NO, NO);
+
+    NSString *suiteName = [NSString stringWithFormat:
+        @"local.timmy.mmf27-dock-swipe-fix.self-test.%@", NSUUID.UUID.UUIDString];
+    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:suiteName];
+    [defaults registerDefaults:@{MMFAlwaysShowMenuBarIconKey: @NO}];
+    valid = valid && ![defaults boolForKey:MMFAlwaysShowMenuBarIconKey];
+    [defaults setBool:YES forKey:MMFAlwaysShowMenuBarIconKey];
+    [defaults synchronize];
+    NSUserDefaults *reloaded = [[NSUserDefaults alloc] initWithSuiteName:suiteName];
+    valid = valid && [reloaded boolForKey:MMFAlwaysShowMenuBarIconKey];
+    [defaults removePersistentDomainForName:suiteName];
+
+    if (!valid) fprintf(stderr, "menu-bar visibility policy self-test failed\n");
+    return valid;
+}
+
 static BOOL MMFRunSelfTest(NSError **error) {
     if (!MMFIsMacOS27OrLater()) {
         if (error) *error = [NSError errorWithDomain:@"MMF27Fix" code:1
@@ -273,6 +402,7 @@ static BOOL MMFRunSelfTest(NSError **error) {
     CGEventSetIntegerValueField(unrelated, MMFCGFieldSubtype, 8);
     valid = valid && !MMFAttachDockSwipePayload(unrelated);
     CFRelease(unrelated);
+    valid = valid && MMFRunMenuBarPolicySelfTest();
 
     if (!valid && error) {
         *error = [NSError errorWithDomain:@"MMF27Fix" code:3
@@ -288,19 +418,34 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
     (void)proxy;
     (void)userInfo;
     if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
-        if (gEventTap) CGEventTapEnable(gEventTap, true);
+        CFMachPortRef eventTap = MMFCopyPublishedEventTap();
+        if (eventTap) {
+            CGEventTapEnable(eventTap, true);
+            BOOL enabled = CGEventTapIsEnabled(eventTap);
+            CFRelease(eventTap);
+            if (!enabled) MMFStopPublishedEventTapRunLoop();
+        }
         return event;
     }
     MMFAttachDockSwipePayload(event);
     return event;
 }
 
-@interface MMFAppDelegate : NSObject <NSApplicationDelegate>
+@interface MMFAppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>
 @property NSStatusItem *statusItem;
+@property NSMenu *statusMenu;
 @property NSMenuItem *statusMenuItem;
+@property NSMenuItem *alwaysShowMenuItem;
 @property NSTimer *retryTimer;
+@property NSTimer *startupRevealTimer;
+@property NSTimer *manualRevealTimer;
 @property NSString *runtimeStatusCode;
+@property NSString *forcedRuntimeStatusCode;
 @property NSThread *eventTapThread;
+@property BOOL alwaysShowMenuBarIcon;
+@property BOOL startupRevealActive;
+@property BOOL manualRevealActive;
+@property BOOL menuOpen;
 @property BOOL terminating;
 @end
 
@@ -308,17 +453,33 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
+    [NSUserDefaults.standardUserDefaults registerDefaults:@{MMFAlwaysShowMenuBarIconKey: @NO}];
+    self.alwaysShowMenuBarIcon = [NSUserDefaults.standardUserDefaults boolForKey:MMFAlwaysShowMenuBarIconKey];
+    self.startupRevealActive = YES;
     [self createStatusMenu];
+    MMFWriteSupportFile(MMFRuntimePIDFileName,
+                        [NSString stringWithFormat:@"%d\n", getpid()]);
+    [NSDistributedNotificationCenter.defaultCenter
+        addObserver:self
+           selector:@selector(showMenuBarControlFromNotification:)
+               name:MMFShowMenuNotification
+             object:nil
+ suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+    [self updateRuntimeStatus:@"starting" title:@"Starting…"];
+    self.startupRevealTimer = [NSTimer scheduledTimerWithTimeInterval:MMFStartupRevealDuration
+                                                               target:self
+                                                             selector:@selector(endStartupReveal:)
+                                                             userInfo:nil
+                                                              repeats:NO];
 
-    if (!MMFIsMacOS27OrLater()) {
-        [self updateRuntimeStatus:@"inactive_wrong_os" title:@"Inactive — macOS 27 is not installed"];
+    self.forcedRuntimeStatusCode = NSProcessInfo.processInfo.environment[@"MMF27_TEST_RUNTIME_STATUS"];
+    if (self.forcedRuntimeStatusCode.length > 0) {
+        NSString *title = [NSString stringWithFormat:@"Test status — %@", self.forcedRuntimeStatusCode];
+        [self updateRuntimeStatus:self.forcedRuntimeStatusCode title:title];
         return;
     }
-    if (!MMFLoadPrivateAPIs()) {
-        [self updateRuntimeStatus:@"error_private_api" title:@"Error — required system API unavailable"];
-        return;
-    }
 
+    if (![self validateRuntimeEnvironment]) return;
     [self attemptToStartEventTapAndPrompt:YES];
     self.retryTimer = [NSTimer scheduledTimerWithTimeInterval:2.0
                                                       target:self
@@ -332,11 +493,20 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
     self.terminating = YES;
     [self.retryTimer invalidate];
     self.retryTimer = nil;
+    [self.startupRevealTimer invalidate];
+    self.startupRevealTimer = nil;
+    [self.manualRevealTimer invalidate];
+    self.manualRevealTimer = nil;
+    [NSDistributedNotificationCenter.defaultCenter removeObserver:self];
 
     // The event tap owns and releases its Core Foundation objects on its
     // dedicated thread. CFRunLoopStop is thread-safe and avoids releasing an
     // event tap while its callback is in flight.
-    if (gEventTapRunLoop) CFRunLoopStop(gEventTapRunLoop);
+    MMFStopPublishedEventTapRunLoop();
+    MMFWriteSupportFile(MMFRuntimeStatusFileName, @"inactive_terminated\n");
+    MMFWriteSupportFile(MMFMenuBarIconStatusFileName, @"not_running\n");
+    [NSFileManager.defaultManager removeItemAtPath:MMFSupportFilePath(MMFRuntimePIDFileName)
+                                             error:nil];
 }
 
 - (void)createStatusMenu {
@@ -348,41 +518,178 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
     self.statusItem.button.toolTip = @"Mac Mouse Fix macOS 27 Dock Swipe Fix";
 
     NSMenu *menu = [[NSMenu alloc] init];
+    menu.delegate = self;
+    self.statusMenu = menu;
     self.statusMenuItem = [[NSMenuItem alloc] initWithTitle:@"Starting…" action:nil keyEquivalent:@""];
     self.statusMenuItem.enabled = NO;
     [menu addItem:self.statusMenuItem];
     [menu addItem:NSMenuItem.separatorItem];
-    [menu addItemWithTitle:@"Open Accessibility Settings…"
-                    action:@selector(openAccessibilitySettings:)
-             keyEquivalent:@""];
-    [menu addItemWithTitle:@"Run Self-Test"
-                    action:@selector(runSelfTestFromMenu:)
-             keyEquivalent:@""];
+    self.alwaysShowMenuItem = [menu addItemWithTitle:@"Always Show Menu Bar Icon"
+                                             action:@selector(toggleAlwaysShowMenuBarIcon:)
+                                      keyEquivalent:@""];
+    self.alwaysShowMenuItem.target = self;
+    self.alwaysShowMenuItem.state = self.alwaysShowMenuBarIcon
+        ? NSControlStateValueOn
+        : NSControlStateValueOff;
     [menu addItem:NSMenuItem.separatorItem];
-    [menu addItemWithTitle:@"Quit Until Next Login"
-                    action:@selector(quit:)
-             keyEquivalent:@"q"];
+    NSMenuItem *accessibilityItem = [menu addItemWithTitle:@"Open Accessibility Settings…"
+                                                   action:@selector(openAccessibilitySettings:)
+                                            keyEquivalent:@""];
+    accessibilityItem.target = self;
+    NSMenuItem *selfTestItem = [menu addItemWithTitle:@"Run Self-Test"
+                                              action:@selector(runSelfTestFromMenu:)
+                                       keyEquivalent:@""];
+    selfTestItem.target = self;
+    [menu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *quitItem = [menu addItemWithTitle:@"Quit Until Next Login"
+                                          action:@selector(quit:)
+                                   keyEquivalent:@"q"];
+    quitItem.target = self;
     self.statusItem.menu = menu;
+    [self refreshMenuBarIconVisibility];
 }
 
 - (void)updateRuntimeStatus:(NSString *)code title:(NSString *)title {
     self.statusMenuItem.title = title;
-    if ([self.runtimeStatusCode isEqualToString:code]) return;
+    BOOL changed = ![self.runtimeStatusCode isEqualToString:code];
     self.runtimeStatusCode = code;
+    [self refreshMenuBarIconVisibility];
+    if (changed) {
+        MMFWriteSupportFile(MMFRuntimeStatusFileName,
+                            [NSString stringWithFormat:@"%@\n", code]);
+        fprintf(stderr, "[MMF27Fix] runtime_status=%s\n", code.UTF8String);
+    }
+}
 
-    NSString *support = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/MMF27 Dock Swipe Fix"];
-    [NSFileManager.defaultManager createDirectoryAtPath:support
-                            withIntermediateDirectories:YES
-                                             attributes:nil
-                                                  error:nil];
-    NSString *statusPath = [support stringByAppendingPathComponent:@"runtime-status.txt"];
-    NSString *line = [NSString stringWithFormat:@"%@\n", code];
-    [line writeToFile:statusPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    fprintf(stderr, "[MMF27Fix] runtime_status=%s\n", code.UTF8String);
+- (void)setMenuBarIconVisible:(BOOL)visible {
+    if (!self.statusItem) return;
+    self.statusItem.visible = visible;
+    MMFWriteSupportFile(MMFMenuBarIconStatusFileName,
+                        visible ? @"visible\n" : @"hidden\n");
+}
+
+- (void)refreshMenuBarIconVisibility {
+    self.alwaysShowMenuItem.state = self.alwaysShowMenuBarIcon
+        ? NSControlStateValueOn
+        : NSControlStateValueOff;
+    BOOL visible = MMFShouldShowMenuBarIcon(self.runtimeStatusCode,
+                                            self.alwaysShowMenuBarIcon,
+                                            self.startupRevealActive,
+                                            self.manualRevealActive,
+                                            self.menuOpen);
+    [self setMenuBarIconVisible:visible];
+}
+
+- (void)endStartupReveal:(NSTimer *)timer {
+    (void)timer;
+    self.startupRevealTimer = nil;
+    self.startupRevealActive = NO;
+    [self refreshMenuBarIconVisibility];
+}
+
+- (void)endManualReveal:(NSTimer *)timer {
+    (void)timer;
+    self.manualRevealTimer = nil;
+    self.manualRevealActive = NO;
+    [self refreshMenuBarIconVisibility];
+}
+
+- (void)menuWillOpen:(NSMenu *)menu {
+    (void)menu;
+    self.menuOpen = YES;
+    [self refreshMenuBarIconVisibility];
+}
+
+- (void)menuDidClose:(NSMenu *)menu {
+    (void)menu;
+    self.menuOpen = NO;
+    if (self.manualRevealActive) {
+        self.manualRevealActive = NO;
+        [self.manualRevealTimer invalidate];
+        self.manualRevealTimer = nil;
+    }
+    [self refreshMenuBarIconVisibility];
+}
+
+- (void)toggleAlwaysShowMenuBarIcon:(id)sender {
+    (void)sender;
+    self.alwaysShowMenuBarIcon = !self.alwaysShowMenuBarIcon;
+    [NSUserDefaults.standardUserDefaults setBool:self.alwaysShowMenuBarIcon
+                                          forKey:MMFAlwaysShowMenuBarIconKey];
+    [NSUserDefaults.standardUserDefaults synchronize];
+    [self refreshMenuBarIconVisibility];
+}
+
+- (void)revealMenuBarControl {
+    self.manualRevealActive = YES;
+    [self.manualRevealTimer invalidate];
+    self.manualRevealTimer = [NSTimer scheduledTimerWithTimeInterval:MMFManualRevealDuration
+                                                              target:self
+                                                            selector:@selector(endManualReveal:)
+                                                            userInfo:nil
+                                                             repeats:NO];
+    [self refreshMenuBarIconVisibility];
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (void)showMenuBarControlFromNotification:(NSNotification *)notification {
+    (void)notification;
+    [self revealMenuBarControl];
+}
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender
+                    hasVisibleWindows:(BOOL)hasVisibleWindows {
+    (void)sender;
+    (void)hasVisibleWindows;
+    [self revealMenuBarControl];
+    return YES;
+}
+
+- (BOOL)validateRuntimeEnvironment {
+    if (!MMFIsMacOS27OrLater()) {
+        [self updateRuntimeStatus:@"inactive_wrong_os"
+                            title:@"Inactive — macOS 27 is not installed"];
+        return NO;
+    }
+    if (!MMFLoadPrivateAPIs()) {
+        [self updateRuntimeStatus:@"error_private_api"
+                            title:@"Error — required system API unavailable"];
+        return NO;
+    }
+    NSError *error = nil;
+    if (!MMFRunSelfTest(&error)) {
+        [self updateRuntimeStatus:@"error_self_test"
+                            title:@"Error — Dock Swipe self-test failed"];
+        NSLog(@"[MMF27Fix] Startup self-test failed: %@", error.localizedDescription);
+        return NO;
+    }
+    atomic_store(&gPatchedEventCount, 0);
+    return YES;
 }
 
 - (void)retryEventTap:(NSTimer *)timer {
     (void)timer;
+    if (self.forcedRuntimeStatusCode.length > 0 || self.terminating) return;
+    if (!AXIsProcessTrusted()) {
+        MMFStopPublishedEventTapRunLoop();
+        [self updateRuntimeStatus:@"waiting_accessibility"
+                            title:@"Waiting for Accessibility permission"];
+        return;
+    }
+    CFMachPortRef eventTap = MMFCopyPublishedEventTap();
+    if (eventTap) {
+        if (!CGEventTapIsEnabled(eventTap)) {
+            CGEventTapEnable(eventTap, true);
+        }
+        BOOL enabled = CGEventTapIsEnabled(eventTap);
+        CFRelease(eventTap);
+        if (!enabled) {
+            MMFStopPublishedEventTapRunLoop();
+            [self updateRuntimeStatus:@"waiting_event_tap"
+                                title:@"Restarting event repair…"];
+            return;
+        }
+    }
     if (!self.eventTapThread || self.eventTapThread.finished) {
         self.eventTapThread = nil;
         [self attemptToStartEventTapAndPrompt:NO];
@@ -449,26 +756,27 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
 
     CFRunLoopRef runLoop = CFRunLoopGetCurrent();
     CFRetain(runLoop);
-    gEventTap = eventTap;
-    gEventTapSource = eventTapSource;
-    gEventTapRunLoop = runLoop;
+    MMFPublishEventTap(eventTap, runLoop);
 
     CFRunLoopAddSource(runLoop, eventTapSource, kCFRunLoopCommonModes);
     CGEventTapEnable(eventTap, true);
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (!self.terminating) {
-            [self updateRuntimeStatus:@"active" title:@"Active — low-latency Dock Swipe repair enabled"];
-            NSLog(@"[MMF27Fix] Low-latency event repair is active");
-        }
-    });
-
-    CFRunLoopRun();
+    BOOL eventTapEnabled = CGEventTapIsEnabled(eventTap);
+    if (eventTapEnabled) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!self.terminating) {
+                [self updateRuntimeStatus:@"active"
+                                    title:@"Active — low-latency Dock Swipe repair enabled"];
+                NSLog(@"[MMF27Fix] Low-latency event repair is active");
+            }
+        });
+        CFRunLoopRun();
+    } else {
+        NSLog(@"[MMF27Fix] Event tap could not be enabled");
+    }
 
     CGEventTapEnable(eventTap, false);
     CFRunLoopRemoveSource(runLoop, eventTapSource, kCFRunLoopCommonModes);
-    gEventTapRunLoop = NULL;
-    gEventTapSource = NULL;
-    gEventTap = NULL;
+    MMFUnpublishEventTap(eventTap, runLoop);
     CFRelease(eventTapSource);
     CFRelease(eventTap);
     CFRelease(runLoop);
@@ -476,8 +784,16 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.eventTapThread == thisThread) self.eventTapThread = nil;
         if (!self.terminating) {
-            [self updateRuntimeStatus:@"waiting_event_tap"
-                                title:@"Restarting event repair…"];
+            if (!AXIsProcessTrusted()) {
+                [self updateRuntimeStatus:@"waiting_accessibility"
+                                    title:@"Waiting for Accessibility permission"];
+            } else if (!eventTapEnabled) {
+                [self updateRuntimeStatus:@"error_event_tap_enable"
+                                    title:@"Error — event repair could not start"];
+            } else {
+                [self updateRuntimeStatus:@"waiting_event_tap"
+                                    title:@"Restarting event repair…"];
+            }
         }
     });
 }
@@ -495,7 +811,7 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = passed ? @"Self-Test Passed" : @"Self-Test Failed";
     alert.informativeText = passed
-        ? [NSString stringWithFormat:@"Dock Swipe HID payload creation works. Patched events this session: %llu.", gPatchedEventCount]
+        ? [NSString stringWithFormat:@"Dock Swipe HID payload creation works. Patched events this session: %llu.", atomic_load(&gPatchedEventCount)]
         : (error.localizedDescription ?: @"Unknown error");
     [alert runModal];
 }
@@ -509,6 +825,7 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        [NSUserDefaults.standardUserDefaults registerDefaults:@{MMFAlwaysShowMenuBarIconKey: @NO}];
         if (argc > 1 && strcmp(argv[1], "--self-test") == 0) {
             NSError *error = nil;
             if (MMFRunSelfTest(&error)) {
@@ -518,23 +835,41 @@ int main(int argc, const char *argv[]) {
             fprintf(stderr, "FAIL: %s\n", error.localizedDescription.UTF8String ?: "unknown error");
             return 1;
         }
+        if (argc > 1 && strcmp(argv[1], "--show-menu") == 0) {
+            [NSDistributedNotificationCenter.defaultCenter
+                postNotificationName:MMFShowMenuNotification
+                              object:nil
+                            userInfo:nil
+                  deliverImmediately:YES];
+            printf("Requested the MMF27 Dock Swipe Fix menu.\n");
+            return 0;
+        }
         if (argc > 1 && strcmp(argv[1], "--status") == 0) {
             NSError *error = nil;
             BOOL apiAvailable = MMFLoadPrivateAPIs();
             BOOL trusted = AXIsProcessTrusted();
             BOOL selfTestPassed = MMFRunSelfTest(&error);
-            NSString *runtimePath = [NSHomeDirectory() stringByAppendingPathComponent:
-                @"Library/Application Support/MMF27 Dock Swipe Fix/runtime-status.txt"];
-            NSString *runtime = [NSString stringWithContentsOfFile:runtimePath
-                                                          encoding:NSUTF8StringEncoding
-                                                             error:nil];
+            NSString *runtime = MMFReadTrimmedSupportFile(MMFRuntimeStatusFileName);
+            BOOL serviceRunning = MMFRecordedRuntimeProcessIsAlive();
+            BOOL alwaysShow = [NSUserDefaults.standardUserDefaults boolForKey:MMFAlwaysShowMenuBarIconKey];
+            NSString *menuBarIcon = serviceRunning
+                ? (MMFReadTrimmedSupportFile(MMFMenuBarIconStatusFileName) ?: @"unknown")
+                : @"not_running";
             printf("macOS=%ld\n", (long)NSProcessInfo.processInfo.operatingSystemVersion.majorVersion);
             printf("private_api=%s\n", apiAvailable ? "ok" : "unavailable");
             printf("accessibility=%s\n", trusted ? "granted" : "pending");
             printf("self_test=%s\n", selfTestPassed ? "pass" : "fail");
-            printf("runtime=%s", runtime.length ? runtime.UTF8String : "unknown\n");
+            printf("runtime=%s\n", runtime.length ? runtime.UTF8String : "unknown");
+            printf("menu_bar_mode=%s\n", alwaysShow ? "always" : "adaptive");
+            printf("menu_bar_icon=%s\n", menuBarIcon.length ? menuBarIcon.UTF8String : "unknown");
+            printf("service=%s\n", serviceRunning ? "running" : "stopped");
             if (error) printf("error=%s\n", error.localizedDescription.UTF8String);
-            return apiAvailable && trusted && selfTestPassed ? 0 : 2;
+            BOOL healthy = apiAvailable
+                && trusted
+                && selfTestPassed
+                && serviceRunning
+                && [runtime isEqualToString:@"active"];
+            return healthy ? 0 : 2;
         }
 
         NSApplication *application = NSApplication.sharedApplication;

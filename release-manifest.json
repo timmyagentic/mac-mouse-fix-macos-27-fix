@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "releaseTag": "v0.2.0",
-  "appVersion": "0.2.0",
-  "archive": "dist/MMF27-Dock-Swipe-Fix-0.2.0.app.zip",
-  "sha256": "1a959247b20eb5e2a559c316a01a0b970a198c8963e580099252ff4678ef56a5",
+  "releaseTag": "v0.3.0",
+  "appVersion": "0.3.0",
+  "archive": "dist/MMF27-Dock-Swipe-Fix-0.3.0.app.zip",
+  "sha256": "7bba2e22618506c659e93605cba2d77dd11414b9768bbdd4432643e98de76dd4",
   "bundleIdentifier": "local.timmy.mmf27-dock-swipe-fix",
   "signingTeamIdentifier": "4356B4HF9R",
   "architectures": [
     "arm64",
     "x86_64"
   ],
-  "source": "https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/tag/v0.2.0"
+  "source": "https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/tag/v0.3.0"
 }

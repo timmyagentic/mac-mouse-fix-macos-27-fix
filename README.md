@@ -21,7 +21,9 @@ approve Accessibility permission in macOS System Settings**.
 ```text
 Install or update MMF27 Dock Swipe Fix from the official npm package. First
 verify that this Mac is running macOS 27 or later and that the official Mac
-Mouse Fix exists at /Applications/Mac Mouse Fix.app. Then run:
+Mouse Fix exists at /Applications/Mac Mouse Fix.app. Run
+`npm view mmf27-dock-swipe-fix version` and stop if it reports a version below
+0.3.0, because the adaptive menu-bar release is not public yet. Then run:
 
 npx --yes mmf27-dock-swipe-fix@latest install
 
@@ -34,7 +36,9 @@ Swipe Fix manually. Finally run:
 npx --yes mmf27-dock-swipe-fix@latest status --json
 
 Report the installed version and whether code_signature, private_api,
-accessibility, self_test, and runtime are healthy.
+accessibility, self_test, service, and runtime are healthy. Also report
+menu_bar_mode and menu_bar_icon. A healthy runtime normally hides its menu-bar
+icon after a short startup grace period; that is expected, not a failure.
 ```
 
 </details>
@@ -45,7 +49,8 @@ accessibility, self_test, and runtime are healthy.
 ```text
 请通过官方 npm 包安装或更新 MMF27 Dock Swipe Fix。先确认这台 Mac 运行的是
 macOS 27 或更高版本，并确认原版 Mac Mouse Fix 位于
-/Applications/Mac Mouse Fix.app。然后运行：
+/Applications/Mac Mouse Fix.app。先运行 `npm view mmf27-dock-swipe-fix version`；
+如果版本低于 0.3.0，请停止，因为自适应菜单栏版本尚未公开发布。确认后再运行：
 
 npx --yes mmf27-dock-swipe-fix@latest install
 
@@ -56,8 +61,9 @@ npx --yes mmf27-dock-swipe-fix@latest install
 
 npx --yes mmf27-dock-swipe-fix@latest status --json
 
-向我报告已安装版本，以及 code_signature、private_api、accessibility、self_test 和
-runtime 是否健康。
+向我报告已安装版本，以及 code_signature、private_api、accessibility、self_test、
+service 和 runtime 是否健康，同时报告 menu_bar_mode 与 menu_bar_icon。健康状态下，
+菜单栏图标通常会在短暂的启动展示后自动隐藏；这是预期行为，并不表示程序退出。
 ```
 
 </details>
@@ -76,20 +82,21 @@ per-user installation—`npx` is only the explicit installer entry point.
 npx --yes mmf27-dock-swipe-fix@latest install
 ```
 
-The npm package contains a pinned, signed v0.2.0 app artifact. Before touching
-the existing installation, it verifies the SHA-256, expanded size, archive
-paths and file types, Apple Developer ID requirement, Team ID, Bundle ID, app
-version, Apple Silicon + Intel architectures, and a non-disruptive HID payload
-self-test. It never uses `postinstall`, `sudo`, or automatic TCC modification.
+Each npm package contains its matching pinned, signed app artifact. Before
+touching the existing installation, it verifies the SHA-256, expanded size,
+archive paths and file types, Apple Developer ID requirement, Team ID, Bundle
+ID, app version, Apple Silicon + Intel architectures, and a non-disruptive HID
+payload self-test. It never uses `postinstall`, `sudo`, or automatic TCC
+modification.
 
 > [!NOTE]
-> v0.2.0 is Developer ID signed but not yet Apple-notarized. The installer does
-> not bypass Gatekeeper or remove quarantine attributes. If macOS displays a
-> warning, follow the manual Control-click **Open** step below.
+> The v0.3.0 app is Developer ID signed but not yet Apple-notarized.
+> The installer does not bypass Gatekeeper or remove quarantine attributes. If
+> macOS displays a warning, follow the manual Control-click **Open** step below.
 >
-> **中文：** v0.2.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会
-> 绕过 Gatekeeper 或删除隔离属性；如果 macOS 显示警告，请按下文方法按住 Control
-> 点击应用并选择“打开”。
+> **中文：** v0.3.0 已使用 Developer ID 签名，但尚未经过 Apple
+> 公证。安装器不会绕过 Gatekeeper 或删除隔离属性；如果 macOS 显示警告，请按下文
+> 方法按住 Control 点击应用并选择“打开”。
 
 After approving **System Settings > Privacy & Security > Accessibility**, run:
 
@@ -97,10 +104,11 @@ After approving **System Settings > Privacy & Security > Accessibility**, run:
 npx --yes mmf27-dock-swipe-fix@latest status --json
 ```
 
-Other commands:
+After npm reports v0.3.0 or later, these commands are also available:
 
 ```bash
 npx --yes mmf27-dock-swipe-fix@latest update
+npx --yes mmf27-dock-swipe-fix@latest show
 npx --yes mmf27-dock-swipe-fix@latest verify-release
 npx --yes mmf27-dock-swipe-fix@latest uninstall
 ```
@@ -129,6 +137,11 @@ transition. It normalizes progress and exit velocity together, preserves the
 source event timestamp, and handles events on a dedicated `userInteractive`
 thread.
 
+Version 0.3.0 adds an adaptive menu-bar controller. The icon appears while the
+app starts, waits for permission, or reports an error, then hides automatically
+after the runtime becomes healthy. An **Always Show Menu Bar Icon** preference
+is available for users who prefer a permanent control surface.
+
 ### Requirements
 
 - macOS 27 or later
@@ -156,7 +169,7 @@ registers a per-user LaunchAgent so it starts after login, launches it, and
 opens the Accessibility settings page when approval is still needed. It does
 not require an npm global install or administrator privileges.
 
-The current v0.2.0 artifact is signed but not yet Apple-notarized. The installer
+The v0.3.0 artifact is signed but not yet Apple-notarized. The installer
 will never disable Gatekeeper or remove quarantine attributes on your behalf.
 
 To preview the exact target paths without changing anything:
@@ -170,7 +183,7 @@ npx --yes mmf27-dock-swipe-fix@latest install --dry-run
 Use this if Node.js/npm is not installed.
 
 1. Open the [latest release](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest).
-2. Download `MMF27-Dock-Swipe-Fix-0.2.0.app.zip` and the matching `.sha256` file.
+2. Download `MMF27-Dock-Swipe-Fix-0.3.0.app.zip` and the matching `.sha256` file.
 3. Double-click the ZIP file to extract **MMF27 Dock Swipe Fix.app**.
 4. In Finder, choose **Go > Go to Folder…**, enter `~/Applications`, and move
    the app there. Create the folder if it does not exist.
@@ -179,8 +192,9 @@ Use this if Node.js/npm is not installed.
 6. Open **System Settings > Privacy & Security > Accessibility** and enable
    **MMF27 Dock Swipe Fix**. If it is not listed, click `+` and select:
    `~/Applications/MMF27 Dock Swipe Fix.app`.
-7. Open the app again. Its mouse icon appears in the menu bar. Installation is
-   complete when the menu says **Active — low-latency Dock Swipe repair enabled**.
+7. Open the app again. Its mouse icon appears briefly while startup checks run.
+   When healthy, the icon hides automatically; confirm installation with the
+   status command below and check that it reports `runtime=active`.
 8. Optional: add the app under **System Settings > General > Login Items** so it
    starts automatically after login.
 
@@ -189,7 +203,7 @@ download in Terminal:
 
 ```bash
 cd "$HOME/Downloads"
-shasum -a 256 -c MMF27-Dock-Swipe-Fix-0.2.0.app.zip.sha256
+shasum -a 256 -c MMF27-Dock-Swipe-Fix-0.3.0.app.zip.sha256
 ```
 
 #### Option C — Build and install from source
@@ -220,10 +234,43 @@ rebuilds:
 MMF27_SIGNING_IDENTITY="Developer ID Application: Example (TEAMID)" ./scripts/install.sh
 ```
 
+### Adaptive menu-bar behavior
+
+Version 0.3.0 keeps the menu-bar icon out of the way when no attention is
+required:
+
+- On first install or launch, the icon stays visible briefly while startup
+  checks finish.
+- With `runtime=active`, the icon hides automatically after that grace period.
+- Waiting for Accessibility permission, an Event Tap startup failure, an
+  unavailable private API, an unsupported system version, or any other error
+  makes the icon appear automatically.
+- After an error recovers and the runtime becomes healthy, the icon hides
+  again.
+- Enable **Always Show Menu Bar Icon** in the menu to keep it visible. This
+  preference is off by default and persists across launches.
+
+The menu continues to provide **Open Accessibility Settings…**, **Run
+Self-Test**, the current status, and **Quit**. If the healthy icon is hidden,
+reveal the controls with:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest show
+```
+
+For a source-installed app, use the exact application path instead:
+
+```bash
+open "$HOME/Applications/MMF27 Dock Swipe Fix.app"
+```
+
+This temporarily reveals the icon; click it to open the diagnostic menu.
+Adaptive hiding resumes after the menu closes or its reveal grace period ends.
+
 ### Verify that it is working
 
-The menu-bar status must say **Active**. The npm installer provides a
-machine-readable check that is especially useful for AI agents:
+Because a healthy icon is hidden by default, use the npm installer's
+machine-readable status instead of relying on a visible menu item:
 
 ```bash
 npx --yes mmf27-dock-swipe-fix@latest status --json
@@ -242,7 +289,17 @@ private_api=ok
 accessibility=granted
 self_test=pass
 runtime=active
+service=running
+menu_bar_mode=adaptive
+menu_bar_icon=hidden
 ```
+
+If **Always Show Menu Bar Icon** is enabled, a healthy installation instead
+reports `menu_bar_mode=always` and `menu_bar_icon=visible`.
+
+If the app is not running, the CLI reports `service=stopped` and
+`menu_bar_icon=not_running`; use `show` or the exact `open` command above to
+start it and restore the controls.
 
 Then test the same Mac Mouse Fix action that failed before, such as holding the
 configured mouse button and dragging left or right to move between Spaces.
@@ -259,15 +316,16 @@ configured mouse button and dragging left or right to move between Spaces.
 4. Enable it and open the app again.
 
 An old test build or backup with the same bundle identifier can cause macOS to
-bind permission to the wrong copy. A visible switch is not enough—the menu status
-must become **Active**.
+bind permission to the wrong copy. A visible switch is not enough—the status
+command must report `accessibility=granted` and `runtime=active`. While the app
+is waiting, its menu-bar icon remains visible for troubleshooting.
 
 #### macOS says the app cannot be opened
 
 The release is signed but not notarized. Control-click the app in Finder, choose
 **Open**, and confirm once. Do not disable Gatekeeper globally.
 
-#### The menu says Active, but gestures still do not work
+#### Status says Active, but gestures still do not work
 
 - Confirm the Mac Mouse Fix action is one of the Dock Swipe actions listed above.
 - Restore the official Mac Mouse Fix app if another patcher modified it.
@@ -298,7 +356,9 @@ recoverable.
 
 If you installed the release app manually:
 
-1. Quit it from the menu-bar mouse icon.
+1. Reopen the installed app with
+   `open "$HOME/Applications/MMF27 Dock Swipe Fix.app"`, then quit it from its
+   mouse icon.
 2. Remove it from **System Settings > General > Login Items**, if added.
 3. Move `~/Applications/MMF27 Dock Swipe Fix.app` to the Trash.
 4. Optionally remove its Accessibility entry.
@@ -323,7 +383,8 @@ event alone.
 - The npm client downloads the installer package; the installed companion app
   itself has no network access
 - No input recording or storage
-- Only the current active/waiting status is saved locally
+- Only runtime status and the **Always Show Menu Bar Icon** preference are saved
+  locally
 - The npm package has no `preinstall`, `install`, or `postinstall` lifecycle
   scripts; system changes happen only after the explicit `install` command
 - The npm installer verifies a pinned SHA-256, archive paths, Developer ID Team
@@ -377,6 +438,10 @@ unstable, hard-coded `CGEvent` offsets.
 0.2.0 还修复了空间切换结束时偶发的反向回弹：进度和离手速度会一起做方向校正，
 原始事件时间戳会被保留，事件处理则运行在独立的 `userInteractive` 线程中。
 
+0.3.0 新增了自适应菜单栏控制：程序启动、等待权限或发生异常时会显示图标；运行状态
+恢复健康后则自动隐藏。如果希望始终保留控制入口，可以打开
+**Always Show Menu Bar Icon** 选项。
+
 ### 使用要求
 
 - macOS 27 或更高版本
@@ -401,7 +466,7 @@ npx --yes mmf27-dock-swipe-fix@latest install
 LaunchAgent 以便登录后自动启动，运行应用，并在仍需授权时打开辅助功能设置页面。
 它不需要全局安装 npm 包，也不需要管理员权限。
 
-当前 v0.2.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会替你关闭
+v0.3.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会替你关闭
 Gatekeeper，也不会删除隔离属性；如果 macOS 显示警告，请按下面手动安装部分的方法，
 按住 Control 点击应用并选择“打开”。
 
@@ -416,7 +481,7 @@ npx --yes mmf27-dock-swipe-fix@latest install --dry-run
 如果没有安装 Node.js/npm，可以使用这种方式。
 
 1. 打开[最新 Release](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest)。
-2. 下载 `MMF27-Dock-Swipe-Fix-0.2.0.app.zip` 和对应的 `.sha256` 文件。
+2. 下载 `MMF27-Dock-Swipe-Fix-0.3.0.app.zip` 和对应的 `.sha256` 文件。
 3. 双击 ZIP，解压得到 **MMF27 Dock Swipe Fix.app**。
 4. 在访达中选择“前往 > 前往文件夹…”，输入 `~/Applications`，把应用移动进去。
    如果这个文件夹不存在，可以先新建。
@@ -425,15 +490,15 @@ npx --yes mmf27-dock-swipe-fix@latest install --dry-run
 6. 打开“系统设置 > 隐私与安全性 > 辅助功能”，启用
    **MMF27 Dock Swipe Fix**。如果列表中没有它，点击 `+` 并选择：
    `~/Applications/MMF27 Dock Swipe Fix.app`。
-7. 再次打开应用。菜单栏会出现鼠标图标；当菜单显示
-   **Active — low-latency Dock Swipe repair enabled** 时，安装完成。
+7. 再次打开应用。启动检查期间菜单栏会短暂出现鼠标图标；健康后图标会自动隐藏。
+   请使用下文的状态命令确认它报告 `runtime=active`。
 8. 可选：在“系统设置 > 通用 > 登录项”中添加这个应用，让它登录后自动启动。
 
 Release 页面同时提供 SHA-256 校验文件。可以在终端中验证下载内容：
 
 ```bash
 cd "$HOME/Downloads"
-shasum -a 256 -c MMF27-Dock-Swipe-Fix-0.2.0.app.zip.sha256
+shasum -a 256 -c MMF27-Dock-Swipe-Fix-0.3.0.app.zip.sha256
 ```
 
 #### 方式三：从源码构建并自动安装
@@ -462,9 +527,38 @@ cd mac-mouse-fix-macos-27-fix
 MMF27_SIGNING_IDENTITY="Developer ID Application: Example (TEAMID)" ./scripts/install.sh
 ```
 
+### 自适应菜单栏行为
+
+0.3.0 会在不需要用户处理时自动收起菜单栏图标：
+
+- 首次安装或每次启动时，图标会短暂显示，等待启动检查结束。
+- `runtime=active` 时，图标会在这段缓冲时间后自动隐藏。
+- 等待辅助功能权限、Event Tap 启动失败、私有 API 不可用、系统版本不符或任何其他
+  异常，都会让图标自动出现。
+- 异常恢复、运行状态重新健康后，图标会再次自动隐藏。
+- 如果希望图标常驻，请在菜单中打开 **Always Show Menu Bar Icon**。该选项默认关闭，
+  并会跨启动持久保存。
+
+菜单仍然保留“打开辅助功能设置”“运行自检”、当前状态和“退出”等排障入口。健康时
+图标隐藏后，可以用下面的命令重新显示控制入口：
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest show
+```
+
+使用源码安装时，请改用精确的应用路径：
+
+```bash
+open "$HOME/Applications/MMF27 Dock Swipe Fix.app"
+```
+
+这会临时显示图标；点击它即可打开排障菜单。菜单关闭或临时展示时间结束后，自适应隐藏
+会继续生效。
+
 ### 验证是否生效
 
-菜单栏状态必须显示 **Active**。npm 安装器提供了适合 AI Agent 读取的 JSON 检查：
+由于健康状态下图标默认隐藏，请使用 npm 安装器提供的 JSON 状态检查，不要以菜单栏
+是否有图标作为健康判据：
 
 ```bash
 npx --yes mmf27-dock-swipe-fix@latest status --json
@@ -483,7 +577,17 @@ private_api=ok
 accessibility=granted
 self_test=pass
 runtime=active
+service=running
+menu_bar_mode=adaptive
+menu_bar_icon=hidden
 ```
+
+如果打开了 **Always Show Menu Bar Icon**，健康状态会改为报告
+`menu_bar_mode=always` 和 `menu_bar_icon=visible`。
+
+如果应用没有运行，CLI 会报告 `service=stopped` 和
+`menu_bar_icon=not_running`；请使用上面的 `show` 或精确 `open` 命令启动应用并恢复
+控制入口。
 
 然后测试之前失效的 Mac Mouse Fix 动作，例如按住配置好的鼠标键并左右拖动切换空间。
 
@@ -499,14 +603,15 @@ runtime=active
 4. 打开权限开关，然后重新启动应用。
 
 旧测试版或备份应用如果使用相同 Bundle ID，macOS 可能会把权限绑定到错误副本。仅仅
-看到开关打开并不代表成功，菜单状态必须真正变成 **Active**。
+看到开关打开并不代表成功，状态命令必须报告 `accessibility=granted` 和
+`runtime=active`。等待期间菜单栏图标会保持显示，便于排障。
 
 #### macOS 提示无法打开应用
 
 Release 已签名但尚未公证。请在访达中按住 Control 点击应用，选择“打开”，并确认一次。
 不建议全局关闭 Gatekeeper。
 
-#### 已经显示 Active，但手势还是不工作
+#### 状态已经是 Active，但手势还是不工作
 
 - 确认 Mac Mouse Fix 中配置的是上面列出的 Dock Swipe 功能。
 - 如果其他补丁修改过 Mac Mouse Fix，请恢复官方版本。
@@ -535,7 +640,8 @@ npx --yes mmf27-dock-swipe-fix@latest uninstall
 
 如果手动安装了 Release 应用：
 
-1. 从菜单栏鼠标图标退出应用。
+1. 先运行 `open "$HOME/Applications/MMF27 Dock Swipe Fix.app"` 重新显示图标，再从
+   鼠标图标退出应用。
 2. 如果添加过登录项，请在“系统设置 > 通用 > 登录项”中移除。
 3. 把 `~/Applications/MMF27 Dock Swipe Fix.app` 移到废纸篓。
 4. 可以同时删除它的辅助功能授权记录。
@@ -556,7 +662,7 @@ velocity，并通过 `SLEventSetIOHIDEvent` 附加到原事件。
 - 不修改或重新签名 `/Applications/Mac Mouse Fix.app`
 - npm 客户端只在获取安装器包时访问网络；安装后的伴随应用本身不访问网络
 - 不记录或保存输入内容
-- 本地只保存当前 active/waiting 状态
+- 本地只保存运行状态和 **Always Show Menu Bar Icon** 偏好
 - npm 包不包含 `preinstall`、`install` 或 `postinstall` 生命周期脚本；只有用户明确
   执行 `install` 子命令后才会修改本地安装
 - 替换旧安装前，npm 安装器会验证固定 SHA-256、解压大小、压缩包路径与文件类型、

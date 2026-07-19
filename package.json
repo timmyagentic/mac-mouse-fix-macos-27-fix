@@ -1,6 +1,6 @@
 {
   "name": "mmf27-dock-swipe-fix",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Safe npm installer for the MMF27 Dock Swipe Fix macOS companion app.",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
   "files": [
     "bin/",
     "lib/",
-    "dist/MMF27-Dock-Swipe-Fix-0.2.0.app.zip",
+    "dist/MMF27-Dock-Swipe-Fix-0.3.0.app.zip",
     "release-manifest.json"
   ],
   "scripts": {
