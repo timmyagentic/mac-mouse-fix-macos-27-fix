@@ -395,6 +395,13 @@ event alone.
 - Uses private SkyLight/HID APIs, so this should be treated as a temporary
   compatibility repair rather than a permanent system extension
 
+After the one-time npm-side Trusted Publisher setup, future maintainer releases
+use the repository's `publish.yml` GitHub Actions workflow. npm authenticates
+that exact workflow with short-lived OIDC credentials, so releases need no
+saved npm write token or repeated interactive 2FA prompt. The package's Trusted
+Publisher must remain bound to `timmyagentic/mac-mouse-fix-macos-27-fix` and
+`publish.yml`.
+
 ### Compatibility
 
 Designed and self-tested on macOS 27 with Mac Mouse Fix 3.1.0 Beta 1. Mac Mouse
@@ -670,6 +677,12 @@ velocity，并通过 `SLEventSetIOHIDEvent` 附加到原事件。
   两种 CPU 架构以及内置 HID 自检
 - 仓库包含完整源码和可在本机构建的脚本
 - 使用 SkyLight/HID 私有 API，因此它应该被视为临时兼容性修复，而不是永久系统扩展
+
+在 npm 侧完成一次性 Trusted Publisher 设置后，后续维护者发布会使用仓库
+`publish.yml` GitHub Actions 工作流。npm 会通过短期 OIDC 凭据验证这个精确工作流，
+因此发布时不需要保存 npm 写入 Token，也不需要每次交互式完成 2FA。npm 包的 Trusted
+Publisher 设置必须继续绑定 `timmyagentic/mac-mouse-fix-macos-27-fix` 和
+`publish.yml`。
 
 ### 兼容性
 
