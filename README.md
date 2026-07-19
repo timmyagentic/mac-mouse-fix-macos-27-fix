@@ -89,23 +89,12 @@ ID, app version, Apple Silicon + Intel architectures, and a non-disruptive HID
 payload self-test. It never uses `postinstall`, `sudo`, or automatic TCC
 modification.
 
-> [!WARNING]
-> npm `latest` still resolves to v0.2.0 until the v0.3.0 package is published.
-> The adaptive menu-bar fields and `show` command below are release-gated and
-> are available only after both npm v0.3.0 and the matching GitHub Release are
-> public. Do not claim that an `@latest` installation has these features before
-> that point.
->
-> **中文：** 在 v0.3.0 正式发布到 npm 前，npm `latest` 仍然指向 v0.2.0。
-> 下文的自适应菜单栏状态字段与 `show` 命令只有在 npm v0.3.0 和对应 GitHub Release
-> 均公开后才可使用。在此之前，不要声称 `@latest` 已包含这些功能。
-
 > [!NOTE]
-> The upcoming v0.3.0 app is Developer ID signed but not yet Apple-notarized.
+> The v0.3.0 app is Developer ID signed but not yet Apple-notarized.
 > The installer does not bypass Gatekeeper or remove quarantine attributes. If
 > macOS displays a warning, follow the manual Control-click **Open** step below.
 >
-> **中文：** 即将发布的 v0.3.0 已使用 Developer ID 签名，但尚未经过 Apple
+> **中文：** v0.3.0 已使用 Developer ID 签名，但尚未经过 Apple
 > 公证。安装器不会绕过 Gatekeeper 或删除隔离属性；如果 macOS 显示警告，请按下文
 > 方法按住 Control 点击应用并选择“打开”。
 
@@ -180,7 +169,7 @@ registers a per-user LaunchAgent so it starts after login, launches it, and
 opens the Accessibility settings page when approval is still needed. It does
 not require an npm global install or administrator privileges.
 
-The upcoming v0.3.0 artifact is signed but not yet Apple-notarized. The installer
+The v0.3.0 artifact is signed but not yet Apple-notarized. The installer
 will never disable Gatekeeper or remove quarantine attributes on your behalf.
 
 To preview the exact target paths without changing anything:
@@ -191,8 +180,7 @@ npx --yes mmf27-dock-swipe-fix@latest install --dry-run
 
 #### Option B — Download the release app manually
 
-Use this if Node.js/npm is not installed. Follow these v0.3.0 steps only after
-the matching GitHub Release is published; until then, use Option C from source.
+Use this if Node.js/npm is not installed.
 
 1. Open the [latest release](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest).
 2. Download `MMF27-Dock-Swipe-Fix-0.3.0.app.zip` and the matching `.sha256` file.
@@ -270,8 +258,7 @@ reveal the controls with:
 npx --yes mmf27-dock-swipe-fix@latest show
 ```
 
-Before the npm v0.3.0 publication, or for a source-installed app, use the exact
-application path instead:
+For a source-installed app, use the exact application path instead:
 
 ```bash
 open "$HOME/Applications/MMF27 Dock Swipe Fix.app"
@@ -479,7 +466,7 @@ npx --yes mmf27-dock-swipe-fix@latest install
 LaunchAgent 以便登录后自动启动，运行应用，并在仍需授权时打开辅助功能设置页面。
 它不需要全局安装 npm 包，也不需要管理员权限。
 
-即将发布的 v0.3.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会替你关闭
+v0.3.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会替你关闭
 Gatekeeper，也不会删除隔离属性；如果 macOS 显示警告，请按下面手动安装部分的方法，
 按住 Control 点击应用并选择“打开”。
 
@@ -491,8 +478,7 @@ npx --yes mmf27-dock-swipe-fix@latest install --dry-run
 
 #### 方式二：手动下载已经构建好的应用
 
-如果没有安装 Node.js/npm，可以使用这种方式。请只在对应的 GitHub v0.3.0 Release
-正式发布后执行下面步骤；在此之前请使用方式三从源码安装。
+如果没有安装 Node.js/npm，可以使用这种方式。
 
 1. 打开[最新 Release](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest)。
 2. 下载 `MMF27-Dock-Swipe-Fix-0.3.0.app.zip` 和对应的 `.sha256` 文件。
@@ -560,7 +546,7 @@ MMF27_SIGNING_IDENTITY="Developer ID Application: Example (TEAMID)" ./scripts/in
 npx --yes mmf27-dock-swipe-fix@latest show
 ```
 
-在 npm v0.3.0 发布前，或使用源码安装时，请改用精确的应用路径：
+使用源码安装时，请改用精确的应用路径：
 
 ```bash
 open "$HOME/Applications/MMF27 Dock Swipe Fix.app"
