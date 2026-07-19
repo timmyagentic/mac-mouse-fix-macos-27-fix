@@ -3,3 +3,5 @@ build/
 main.plist
 *.zip
 *.sha256
+!dist/
+!dist/MMF27-Dock-Swipe-Fix-*.app.zip

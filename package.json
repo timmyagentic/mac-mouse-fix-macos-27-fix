@@ -1,0 +1,54 @@
+{
+  "name": "mmf27-dock-swipe-fix",
+  "version": "0.2.0",
+  "description": "Safe npm installer for the MMF27 Dock Swipe Fix macOS companion app.",
+  "type": "module",
+  "bin": {
+    "mac-mouse-fix-macos-27-fix": "bin/mmf27-fix.js",
+    "mmf27-fix": "bin/mmf27-fix.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "dist/MMF27-Dock-Swipe-Fix-0.2.0.app.zip",
+    "release-manifest.json"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "npm test && node ./bin/mmf27-fix.js --help && npm run verify-release && npm pack --dry-run",
+    "verify-release": "node ./bin/mmf27-fix.js verify-release",
+    "prepublishOnly": "npm run check"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64",
+    "x64"
+  ],
+  "keywords": [
+    "mac-mouse-fix",
+    "macos",
+    "macos-27",
+    "mission-control",
+    "spaces",
+    "mouse",
+    "installer"
+  ],
+  "author": "Timmy ZHOU",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix.git"
+  },
+  "bugs": {
+    "url": "https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/issues"
+  },
+  "homepage": "https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}
