@@ -1,14 +1,109 @@
 # MMF27 Dock Swipe Fix
 
-[English](#english) · [中文](#中文)
+[![npm version](https://img.shields.io/npm/v/mmf27-dock-swipe-fix.svg)](https://www.npmjs.com/package/mmf27-dock-swipe-fix)
+[![GitHub release](https://img.shields.io/github/v/release/timmyagentic/mac-mouse-fix-macos-27-fix)](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 An unofficial, temporary companion repair for Mac Mouse Fix Dock Swipe gestures
 on macOS 27.
+
+[English](#english) · [中文](#中文)
+
+## Install with an AI agent / 使用 AI Agent 安装
+
+Copy either prompt into Codex, Claude Code, Cursor, or another local coding
+agent. The agent can install and verify the app, but **you must personally
+approve Accessibility permission in macOS System Settings**.
+
+<details open>
+<summary><strong>English prompt</strong></summary>
+
+```text
+Install or update MMF27 Dock Swipe Fix from the official npm package. First
+verify that this Mac is running macOS 27 or later and that the official Mac
+Mouse Fix exists at /Applications/Mac Mouse Fix.app. Then run:
+
+npx --yes mmf27-dock-swipe-fix@latest install
+
+Do not use sudo, disable Gatekeeper, remove quarantine attributes, edit the TCC
+database, or modify/re-sign Mac Mouse Fix. Stop if checksum, Developer ID,
+Bundle ID, architecture, or self-test verification fails. If Accessibility is
+pending, open the correct System Settings page and ask me to enable MMF27 Dock
+Swipe Fix manually. Finally run:
+
+npx --yes mmf27-dock-swipe-fix@latest status --json
+
+Report the installed version and whether code_signature, private_api,
+accessibility, self_test, and runtime are healthy.
+```
+
+</details>
+
+<details>
+<summary><strong>中文提示词</strong></summary>
+
+```text
+请通过官方 npm 包安装或更新 MMF27 Dock Swipe Fix。先确认这台 Mac 运行的是
+macOS 27 或更高版本，并确认原版 Mac Mouse Fix 位于
+/Applications/Mac Mouse Fix.app。然后运行：
+
+npx --yes mmf27-dock-swipe-fix@latest install
+
+不要使用 sudo，不要关闭 Gatekeeper、删除隔离属性、修改 TCC 数据库，也不要修改或
+重新签名 Mac Mouse Fix。如果 SHA-256、Developer ID、Bundle ID、双架构或自检任一
+验证失败，立即停止。如果辅助功能权限尚未授权，请打开正确的系统设置页面，让我手动
+启用 MMF27 Dock Swipe Fix。最后运行：
+
+npx --yes mmf27-dock-swipe-fix@latest status --json
+
+向我报告已安装版本，以及 code_signature、private_api、accessibility、self_test 和
+runtime 是否健康。
+```
+
+</details>
 
 > [!IMPORTANT]
 > This is an independent compatibility project. It is not affiliated with or
 > endorsed by Mac Mouse Fix or Apple. Remove it after Mac Mouse Fix ships an
 > official macOS 27 fix.
+
+## One-command install / 一行命令安装
+
+Requires Node.js 18.17 or later with npm. This command performs a persistent
+per-user installation—`npx` is only the explicit installer entry point.
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest install
+```
+
+The npm package contains a pinned, signed v0.2.0 app artifact. Before touching
+the existing installation, it verifies the SHA-256, expanded size, archive
+paths and file types, Apple Developer ID requirement, Team ID, Bundle ID, app
+version, Apple Silicon + Intel architectures, and a non-disruptive HID payload
+self-test. It never uses `postinstall`, `sudo`, or automatic TCC modification.
+
+> [!NOTE]
+> v0.2.0 is Developer ID signed but not yet Apple-notarized. The installer does
+> not bypass Gatekeeper or remove quarantine attributes. If macOS displays a
+> warning, follow the manual Control-click **Open** step below.
+>
+> **中文：** v0.2.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会
+> 绕过 Gatekeeper 或删除隔离属性；如果 macOS 显示警告，请按下文方法按住 Control
+> 点击应用并选择“打开”。
+
+After approving **System Settings > Privacy & Security > Accessibility**, run:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest status --json
+```
+
+Other commands:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest update
+npx --yes mmf27-dock-swipe-fix@latest verify-release
+npx --yes mmf27-dock-swipe-fix@latest uninstall
+```
 
 <a id="english"></a>
 
@@ -37,9 +132,10 @@ thread.
 ### Requirements
 
 - macOS 27 or later
-- Mac Mouse Fix installed; the source installer expects it at
+- Mac Mouse Fix installed at
   `/Applications/Mac Mouse Fix.app`
 - Accessibility permission for **MMF27 Dock Swipe Fix**
+- For the recommended npm installer: Node.js 18.17 or later with npm
 - For source builds: Xcode Command Line Tools
 
 Use an official, unmodified Mac Mouse Fix installation. If you previously used
@@ -49,9 +145,29 @@ the same time.
 
 ### Installation tutorial
 
-#### Option A — Download the release app
+#### Option A — Install with npm (recommended)
 
-This is the easiest installation method.
+```bash
+npx --yes mmf27-dock-swipe-fix@latest install
+```
+
+The command verifies and installs the signed app under `~/Applications`,
+registers a per-user LaunchAgent so it starts after login, launches it, and
+opens the Accessibility settings page when approval is still needed. It does
+not require an npm global install or administrator privileges.
+
+The current v0.2.0 artifact is signed but not yet Apple-notarized. The installer
+will never disable Gatekeeper or remove quarantine attributes on your behalf.
+
+To preview the exact target paths without changing anything:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest install --dry-run
+```
+
+#### Option B — Download the release app manually
+
+Use this if Node.js/npm is not installed.
 
 1. Open the [latest release](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest).
 2. Download `MMF27-Dock-Swipe-Fix-0.2.0.app.zip` and the matching `.sha256` file.
@@ -76,7 +192,7 @@ cd "$HOME/Downloads"
 shasum -a 256 -c MMF27-Dock-Swipe-Fix-0.2.0.app.zip.sha256
 ```
 
-#### Option B — Build and install from source
+#### Option C — Build and install from source
 
 Install the Xcode Command Line Tools if needed:
 
@@ -106,7 +222,14 @@ MMF27_SIGNING_IDENTITY="Developer ID Application: Example (TEAMID)" ./scripts/in
 
 ### Verify that it is working
 
-The menu-bar status must say **Active**. You can also run:
+The menu-bar status must say **Active**. The npm installer provides a
+machine-readable check that is especially useful for AI agents:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest status --json
+```
+
+You can also call the installed app directly:
 
 ```bash
 "$HOME/Applications/MMF27 Dock Swipe Fix.app/Contents/MacOS/MMF27DockSwipeFix" --status
@@ -155,6 +278,15 @@ The release is signed but not notarized. Control-click the app in Finder, choose
 
 ### Uninstall
 
+For an npm installation, run:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest uninstall
+```
+
+The app and LaunchAgent are moved to a timestamped folder in the Trash, so the
+operation remains recoverable. Logs and installation backups are retained.
+
 If you installed from source, run this inside the cloned repository:
 
 ```bash
@@ -188,9 +320,16 @@ event alone.
 
 - No administrator privileges
 - No modification or re-signing of `/Applications/Mac Mouse Fix.app`
-- No network access
+- The npm client downloads the installer package; the installed companion app
+  itself has no network access
 - No input recording or storage
 - Only the current active/waiting status is saved locally
+- The npm package has no `preinstall`, `install`, or `postinstall` lifecycle
+  scripts; system changes happen only after the explicit `install` command
+- The npm installer verifies a pinned SHA-256, archive paths, Developer ID Team
+  `4356B4HF9R`, the Apple Developer ID requirement, Bundle ID, app version,
+  expanded size and file types, both CPU architectures, and the built-in HID
+  self-test before replacing an existing installation
 - Source code and reproducible local build scripts are included
 - Uses private SkyLight/HID APIs, so this should be treated as a temporary
   compatibility repair rather than a permanent system extension
@@ -206,7 +345,9 @@ mouse model has been independently tested.
 The implementation follows the safer direction explored in upstream PRs
 [#1916](https://github.com/noah-nuebling/mac-mouse-fix/pull/1916),
 [#1920](https://github.com/noah-nuebling/mac-mouse-fix/pull/1920), and
-[#1924](https://github.com/noah-nuebling/mac-mouse-fix/pull/1924): attach the
+[#1924](https://github.com/noah-nuebling/mac-mouse-fix/pull/1924). The tested
+companion findings were also submitted upstream in
+[#1936](https://github.com/noah-nuebling/mac-mouse-fix/pull/1936): attach the
 HID payload through `SLEventSetIOHIDEvent` instead of writing a pointer through
 unstable, hard-coded `CGEvent` offsets.
 
@@ -239,9 +380,10 @@ unstable, hard-coded `CGEvent` offsets.
 ### 使用要求
 
 - macOS 27 或更高版本
-- 已安装 Mac Mouse Fix；源码安装脚本要求它位于
+- 已安装 Mac Mouse Fix，并且它位于
   `/Applications/Mac Mouse Fix.app`
 - 给 **MMF27 Dock Swipe Fix** 授予“辅助功能”权限
+- 如果使用推荐的 npm 安装方式，需要 Node.js 18.17 或更高版本以及 npm
 - 如果从源码构建，需要安装 Xcode Command Line Tools
 
 请使用官方、未经修改的 Mac Mouse Fix。如果以前安装过会修改或重新签名 Mac Mouse
@@ -249,9 +391,29 @@ Fix 的补丁，请先恢复官方应用。不要同时运行多个 macOS 27 修
 
 ### 安装教程
 
-#### 方式一：下载已经构建好的应用
+#### 方式一：通过 npm 安装（推荐）
 
-这是最简单的安装方式。
+```bash
+npx --yes mmf27-dock-swipe-fix@latest install
+```
+
+这条命令会验证签名与完整性，把应用安装到 `~/Applications`，注册当前用户的
+LaunchAgent 以便登录后自动启动，运行应用，并在仍需授权时打开辅助功能设置页面。
+它不需要全局安装 npm 包，也不需要管理员权限。
+
+当前 v0.2.0 已使用 Developer ID 签名，但尚未经过 Apple 公证。安装器不会替你关闭
+Gatekeeper，也不会删除隔离属性；如果 macOS 显示警告，请按下面手动安装部分的方法，
+按住 Control 点击应用并选择“打开”。
+
+如果只想预览安装目标而不修改任何内容：
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest install --dry-run
+```
+
+#### 方式二：手动下载已经构建好的应用
+
+如果没有安装 Node.js/npm，可以使用这种方式。
 
 1. 打开[最新 Release](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest)。
 2. 下载 `MMF27-Dock-Swipe-Fix-0.2.0.app.zip` 和对应的 `.sha256` 文件。
@@ -274,7 +436,7 @@ cd "$HOME/Downloads"
 shasum -a 256 -c MMF27-Dock-Swipe-Fix-0.2.0.app.zip.sha256
 ```
 
-#### 方式二：从源码构建并自动安装
+#### 方式三：从源码构建并自动安装
 
 如果还没有安装 Xcode Command Line Tools：
 
@@ -302,7 +464,13 @@ MMF27_SIGNING_IDENTITY="Developer ID Application: Example (TEAMID)" ./scripts/in
 
 ### 验证是否生效
 
-菜单栏状态必须显示 **Active**。也可以运行：
+菜单栏状态必须显示 **Active**。npm 安装器提供了适合 AI Agent 读取的 JSON 检查：
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest status --json
+```
+
+也可以直接调用已安装应用：
 
 ```bash
 "$HOME/Applications/MMF27 Dock Swipe Fix.app/Contents/MacOS/MMF27DockSwipeFix" --status
@@ -348,6 +516,15 @@ Release 已签名但尚未公证。请在访达中按住 Control 点击应用，
 
 ### 卸载
 
+如果通过 npm 安装，请运行：
+
+```bash
+npx --yes mmf27-dock-swipe-fix@latest uninstall
+```
+
+应用和 LaunchAgent 会被移动到废纸篓里的时间戳文件夹，因此仍然可以恢复；日志和安装
+备份会被保留。
+
 如果通过源码安装，请在克隆的仓库目录中运行：
 
 ```bash
@@ -377,9 +554,14 @@ velocity，并通过 `SLEventSetIOHIDEvent` 附加到原事件。
 
 - 不需要管理员权限
 - 不修改或重新签名 `/Applications/Mac Mouse Fix.app`
-- 不访问网络
+- npm 客户端只在获取安装器包时访问网络；安装后的伴随应用本身不访问网络
 - 不记录或保存输入内容
 - 本地只保存当前 active/waiting 状态
+- npm 包不包含 `preinstall`、`install` 或 `postinstall` 生命周期脚本；只有用户明确
+  执行 `install` 子命令后才会修改本地安装
+- 替换旧安装前，npm 安装器会验证固定 SHA-256、解压大小、压缩包路径与文件类型、
+  Apple Developer ID 要求、Developer ID Team `4356B4HF9R`、Bundle ID、应用版本、
+  两种 CPU 架构以及内置 HID 自检
 - 仓库包含完整源码和可在本机构建的脚本
 - 使用 SkyLight/HID 私有 API，因此它应该被视为临时兼容性修复，而不是永久系统扩展
 
@@ -394,8 +576,10 @@ velocity，并通过 `SLEventSetIOHIDEvent` 附加到原事件。
 [#1916](https://github.com/noah-nuebling/mac-mouse-fix/pull/1916)、
 [#1920](https://github.com/noah-nuebling/mac-mouse-fix/pull/1920) 和
 [#1924](https://github.com/noah-nuebling/mac-mouse-fix/pull/1924)
-探索的更安全方向：通过 `SLEventSetIOHIDEvent` 附加 HID 数据，而不是依赖不稳定的
-硬编码 `CGEvent` 内部偏移写入指针。
+探索的更安全方向；这个伴随程序的实测结论也已经通过
+[#1936](https://github.com/noah-nuebling/mac-mouse-fix/pull/1936)
+提交给上游：通过 `SLEventSetIOHIDEvent` 附加 HID 数据，而不是依赖不稳定的硬编码
+`CGEvent` 内部偏移写入指针。
 
 ### 许可证
 
