@@ -10,12 +10,14 @@
   "files": [
     "bin/",
     "lib/",
+    "scripts/verify-publish.js",
     "dist/MMF27-Dock-Swipe-Fix-0.3.0.app.zip",
     "release-manifest.json"
   ],
   "scripts": {
     "test": "node --test",
-    "check": "npm test && node ./bin/mmf27-fix.js --help && npm run verify-release && npm pack --dry-run",
+    "check": "npm test && node ./bin/mmf27-fix.js --help && npm run verify-publish && npm run verify-release && npm pack --dry-run",
+    "verify-publish": "node ./scripts/verify-publish.js",
     "verify-release": "node ./bin/mmf27-fix.js verify-release",
     "prepublishOnly": "npm run check"
   },

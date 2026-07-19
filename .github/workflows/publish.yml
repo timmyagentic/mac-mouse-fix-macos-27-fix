@@ -1,0 +1,62 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ !github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Use an OIDC-capable npm CLI
+        run: npm install --global npm@11
+
+      - name: Install package metadata
+        run: npm ci --ignore-scripts
+
+      - name: Run portable tests
+        run: npm test
+
+      - name: Verify version and archive checksum
+        run: npm run verify-publish
+
+      - name: Verify the signed universal app
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d "$RUNNER_TEMP/mmf27-release.XXXXXX")"
+          /usr/bin/ditto -x -k "dist/MMF27-Dock-Swipe-Fix-${GITHUB_REF_NAME#v}.app.zip" "$verify_dir"
+          app="$verify_dir/MMF27 Dock Swipe Fix.app"
+          executable="$app/Contents/MacOS/MMF27DockSwipeFix"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$app"
+          signature="$(/usr/bin/codesign -dv --verbose=4 "$app" 2>&1)"
+          grep -F "Identifier=local.timmy.mmf27-dock-swipe-fix" <<<"$signature"
+          grep -F "TeamIdentifier=4356B4HF9R" <<<"$signature"
+          grep -F "Authority=Developer ID Application: TINGJUN ZHOU (4356B4HF9R)" <<<"$signature"
+          architectures="$(/usr/bin/lipo -archs "$executable")"
+          [[ " $architectures " == *" arm64 "* ]]
+          [[ " $architectures " == *" x86_64 "* ]]
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          [[ "v$version" == "$GITHUB_REF_NAME" ]]
+
+      - name: Publish with npm Trusted Publishing
+        run: npm publish --ignore-scripts --access public
