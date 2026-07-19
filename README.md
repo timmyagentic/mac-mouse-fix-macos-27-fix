@@ -22,8 +22,8 @@ approve Accessibility permission in macOS System Settings**.
 Install or update MMF27 Dock Swipe Fix from the official npm package. First
 verify that this Mac is running macOS 27 or later and that the official Mac
 Mouse Fix exists at /Applications/Mac Mouse Fix.app. Run
-`npm view mmf27-dock-swipe-fix version` and stop if it reports a version below
-0.3.0, because the adaptive menu-bar release is not public yet. Then run:
+`npm view mmf27-dock-swipe-fix version` and confirm it reports 0.3.0 or later.
+Then run:
 
 npx --yes mmf27-dock-swipe-fix@latest install
 
@@ -49,8 +49,8 @@ icon after a short startup grace period; that is expected, not a failure.
 ```text
 请通过官方 npm 包安装或更新 MMF27 Dock Swipe Fix。先确认这台 Mac 运行的是
 macOS 27 或更高版本，并确认原版 Mac Mouse Fix 位于
-/Applications/Mac Mouse Fix.app。先运行 `npm view mmf27-dock-swipe-fix version`；
-如果版本低于 0.3.0，请停止，因为自适应菜单栏版本尚未公开发布。确认后再运行：
+/Applications/Mac Mouse Fix.app。先运行 `npm view mmf27-dock-swipe-fix version`，
+确认版本为 0.3.0 或更高版本，然后运行：
 
 npx --yes mmf27-dock-swipe-fix@latest install
 
