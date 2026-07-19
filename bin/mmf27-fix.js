@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import {
   installRelease,
   installationStatus,
+  showInstalledMenu,
   uninstall,
   verifyRelease,
 } from "../lib/installer.js";
@@ -18,6 +19,7 @@ Usage:
   mmf27-fix install [--dry-run] [--no-open-settings]
   mmf27-fix update [--no-open-settings]
   mmf27-fix status [--json]
+  mmf27-fix show
   mmf27-fix verify-release
   mmf27-fix uninstall
 
@@ -75,6 +77,11 @@ async function main() {
       throw new Error("status only accepts --json.");
     }
     return installationStatus({ json: args[0] === "--json" });
+  }
+  if (command === "show") {
+    if (args.length > 0) throw new Error("show does not accept options.");
+    await showInstalledMenu();
+    return 0;
   }
   if (command === "uninstall") {
     if (args.length > 0) throw new Error("uninstall does not accept options.");

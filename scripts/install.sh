@@ -76,7 +76,9 @@ sleep 2
 
 echo
 echo "Installed: $INSTALL_APP"
-echo "The mouse icon in the menu bar will show the repair status."
+echo "The mouse icon appears during startup or when attention is needed."
+echo "When runtime=active it hides automatically unless Always Show is enabled."
+echo "To reopen its controls later, run: open \"$INSTALL_APP\""
 echo "If macOS asks, approve MMF27 Dock Swipe Fix under:"
 echo "System Settings > Privacy & Security > Accessibility"
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" >/dev/null 2>&1 || true
