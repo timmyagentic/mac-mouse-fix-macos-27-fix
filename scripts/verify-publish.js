@@ -42,7 +42,7 @@ assert(
   publishTag === expectedPublishTag,
   `Package ${packageJSON.version} must use npm dist-tag ${expectedPublishTag} (received ${publishTag})`,
 );
-if (process.env.GITHUB_REF_NAME) {
+if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME) {
   assert(
     process.env.GITHUB_REF_NAME === manifest.releaseTag,
     `Workflow ref ${process.env.GITHUB_REF_NAME} does not match ${manifest.releaseTag}`,
