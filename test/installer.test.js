@@ -26,8 +26,8 @@ const exec = promisify(execFile);
 test("release manifest is pinned to the npm package and signing policy", async () => {
   const manifest = await loadReleaseManifest();
   assert.equal(manifest.packageName, "mmf27-dock-swipe-fix");
-  assert.equal(manifest.installerVersion, "0.3.0");
-  assert.equal(manifest.releaseTag, "v0.3.0");
+  assert.equal(manifest.installerVersion, "0.4.0-beta.1");
+  assert.equal(manifest.releaseTag, "v0.4.0-beta.1");
   assert.equal(manifest.bundleIdentifier, PROJECT.bundleIdentifier);
   assert.equal(manifest.signingTeamIdentifier, PROJECT.signingTeamIdentifier);
   assert.deepEqual(manifest.architectures.sort(), ["arm64", "x86_64"]);
@@ -182,11 +182,11 @@ test("launch agent escapes paths and contains the exact installed executable", (
 
 test("CLI exposes help and package version", async () => {
   const helpResult = await exec(process.execPath, ["bin/mmf27-fix.js", "--help"]);
-  assert.match(helpResult.stdout, /npx --yes mmf27-dock-swipe-fix@latest install/);
+  assert.match(helpResult.stdout, /npx --yes mmf27-dock-swipe-fix@beta install/);
   assert.match(helpResult.stdout, /never uses sudo/i);
   assert.match(helpResult.stdout, /mmf27-fix show/);
   const versionResult = await exec(process.execPath, ["bin/mmf27-fix.js", "--version"]);
-  assert.equal(versionResult.stdout.trim(), "0.3.0");
+  assert.equal(versionResult.stdout.trim(), "0.4.0-beta.1");
 });
 
 test("CLI rejects unsupported status options", async () => {

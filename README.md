@@ -9,6 +9,27 @@ on macOS 27.
 
 [English](#english) · [中文](#中文)
 
+## 0.4 beta / 0.4 测试版
+
+`0.4.0-beta.1` fixes the vertical-up Mission Control stutter reported in
+[Issue #5](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/issues/5).
+It converts each legacy Dock Swipe into a fresh type-30 event containing only
+the macOS 27 HID payload, so obsolete progress/gesture fields no longer reach
+WindowServer alongside the new representation.
+
+`0.4.0-beta.1` 修复了 [Issue #5](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/issues/5)
+报告的“向上拖动进入 Mission Control 时动画卡顿”。它会把旧 Dock Swipe 转换为全新的
+type-30 事件，只保留 macOS 27 所需的 HID payload，避免旧 progress/gesture 字段与
+新事件语义同时进入 WindowServer。
+
+Install this prerelease explicitly; the stable `latest` channel remains on
+v0.3.0:
+
+```bash
+npx --yes mmf27-dock-swipe-fix@beta install
+npx --yes mmf27-dock-swipe-fix@beta status --json
+```
+
 ## Install with an AI agent / 使用 AI Agent 安装
 
 Copy either prompt into Codex, Claude Code, Cursor, or another local coding
