@@ -12,6 +12,9 @@ import {
 const packageJSON = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
+const distributionTag = packageJSON.version.includes("-")
+  ? (packageJSON.publishConfig?.tag ?? "beta")
+  : "latest";
 
 const help = `MMF27 Dock Swipe Fix ${packageJSON.version}
 
@@ -24,7 +27,7 @@ Usage:
   mmf27-fix uninstall
 
 Recommended one-line install:
-  npx --yes mmf27-dock-swipe-fix@latest install
+  npx --yes mmf27-dock-swipe-fix@${distributionTag} install
 
 The installer never uses sudo, disables Gatekeeper, removes quarantine, or
 edits the macOS TCC database. Accessibility permission still requires your

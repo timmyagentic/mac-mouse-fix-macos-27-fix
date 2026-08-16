@@ -9,6 +9,7 @@
 #import <pthread.h>
 #import <signal.h>
 #import <stdatomic.h>
+#import <string.h>
 #import <unistd.h>
 
 // Private types are intentionally declared locally so the project builds with
@@ -60,6 +61,7 @@ static const CGEventField MMFCGFieldProgress = (CGEventField)124;
 static const CGEventField MMFCGFieldVelocityX = (CGEventField)129;
 static const CGEventField MMFCGFieldVelocityY = (CGEventField)130;
 static const CGEventField MMFCGFieldPhase = (CGEventField)132;
+static const CGEventField MMFCGFieldLegacyProgressBits = (CGEventField)135;
 static const CGEventField MMFCGFieldInvertedFromDevice = (CGEventField)136;
 
 static SLEventSetIOHIDEventFn gSetHIDEvent = NULL;
@@ -205,19 +207,28 @@ static BOOL MMFTimestampsEquivalent(uint64_t actual, uint64_t expected) {
     return difference <= 1000;
 }
 
-static BOOL MMFAttachDockSwipePayload(CGEventRef event) {
-    if (!event || !MMFIsMacOS27OrLater() || !MMFLoadPrivateAPIs()) return NO;
+// Returns a retained, replacement type-30 event when `event` is a legacy Mac
+// Mouse Fix Dock Swipe. Returning a fresh wrapper is important on macOS 27:
+// the legacy CGEvent carries private fields whose numbers now overlap gesture
+// flag semantics. Attaching a HID payload to that same object leaves both
+// representations visible to WindowServer and can make vertical-up Mission
+// Control progress updates stutter.
+static CGEventRef MMFCreateDockSwipeReplacement(CGEventRef event) {
+    if (!event
+        || CGEventGetType(event) != (CGEventType)30
+        || !MMFIsMacOS27OrLater()
+        || !MMFLoadPrivateAPIs()) return NULL;
 
     int64_t subtype = CGEventGetIntegerValueField(event, MMFCGFieldSubtype);
-    if (subtype != MMFHIDEventTypeDockSwipe) return NO;
+    if (subtype != MMFHIDEventTypeDockSwipe) return NULL;
 
     MMFHIDEvent *existing = MMFCopyExistingHIDEvent(event);
-    if (existing.type == MMFHIDEventTypeDockSwipe) return NO;
+    if (existing.type == MMFHIDEventTypeDockSwipe) return NULL;
 
     NSInteger motion = (NSInteger)llround(CGEventGetDoubleValueField(event, MMFCGFieldMotion));
     if (motion < 1 || motion > 3) {
         NSLog(@"[MMF27Fix] Ignoring dock-swipe with unexpected motion %ld", (long)motion);
-        return NO;
+        return NULL;
     }
 
     uint32_t phase = (uint32_t)CGEventGetIntegerValueField(event, MMFCGFieldPhase) & MMFHIDEventPhaseMask;
@@ -244,7 +255,7 @@ static BOOL MMFAttachDockSwipePayload(CGEventRef event) {
     MMFHIDEvent *hidEvent = [[gHIDEventClass alloc] initWithType:MMFHIDEventTypeDockSwipe
                                                       timestamp:eventTimestamp
                                                        senderID:0];
-    if (!hidEvent) return NO;
+    if (!hidEvent) return NULL;
 
     hidEvent.options = phase << MMFHIDEventPhaseShift;
     [hidEvent setIntegerValue:motion forField:MMFHIDFieldDockSwipeMotion];
@@ -263,7 +274,22 @@ static BOOL MMFAttachDockSwipePayload(CGEventRef event) {
         }
     }
 
-    gSetHIDEvent(event, (__bridge CFTypeRef)hidEvent);
+    // Build from the incoming public event source instead of copying the
+    // event. This keeps source compatibility, modifier flags, pointer
+    // location, and timing while deliberately excluding every legacy private
+    // CGEvent field. Some private sources cannot be copied; CGEventCreate(NULL)
+    // is the documented fallback and matches Mac Mouse Fix's native path.
+    CGEventSourceRef source = CGEventCreateSourceFromEvent(event);
+    CGEventRef replacement = CGEventCreate(source);
+    if (source) CFRelease(source);
+    if (!replacement) return NULL;
+
+    CGEventSetType(replacement, (CGEventType)30);
+    CGEventSetTimestamp(replacement, eventTimestamp);
+    CGEventSetFlags(replacement, CGEventGetFlags(event));
+    CGEventSetLocation(replacement, CGEventGetLocation(event));
+    gSetHIDEvent(replacement, (__bridge CFTypeRef)hidEvent);
+
     uint64_t patchedEventCount = atomic_fetch_add(&gPatchedEventCount, 1) + 1;
     if ((phase == MMFHIDEventPhaseEnded || phase == MMFHIDEventPhaseCancelled)
         && getenv("MMF27_VERBOSE_EVENTS") != NULL) {
@@ -278,7 +304,7 @@ static BOOL MMFAttachDockSwipePayload(CGEventRef event) {
                 velocityX,
                 velocityY);
     }
-    return YES;
+    return replacement;
 }
 
 static BOOL MMFRunSelfTestCase(NSInteger motion,
@@ -290,6 +316,10 @@ static BOOL MMFRunSelfTestCase(NSInteger motion,
     CGEventRef event = CGEventCreate(NULL);
     CGEventSetType(event, (CGEventType)30);
     CGEventSetTimestamp(event, eventTimestamp);
+    CGEventFlags expectedFlags = kCGEventFlagMaskShift | kCGEventFlagMaskAlternate;
+    CGPoint expectedLocation = CGPointMake(100.0 + motion, 200.0 + phase);
+    CGEventSetFlags(event, expectedFlags);
+    CGEventSetLocation(event, expectedLocation);
     CGEventSetIntegerValueField(event, MMFCGFieldSubtype, MMFHIDEventTypeDockSwipe);
     CGEventSetIntegerValueField(event, MMFCGFieldMotion, motion);
     CGEventSetIntegerValueField(event, MMFCGFieldPhase, phase);
@@ -297,12 +327,25 @@ static BOOL MMFRunSelfTestCase(NSInteger motion,
     CGEventSetIntegerValueField(event, MMFCGFieldInvertedFromDevice, inverted);
     CGEventSetDoubleValueField(event, MMFCGFieldVelocityX, velocityValue);
     CGEventSetDoubleValueField(event, MMFCGFieldVelocityY, velocityValue);
+    // Mac Mouse Fix 3.1.0 Beta 1 bit-packs its Float32 progress into field
+    // 135. A macOS 27 HID-backed event must not carry this legacy value into
+    // WindowServer, where the same field has gesture-flag semantics.
+    Float32 legacyProgress = (Float32)progress;
+    uint32_t legacyProgressBits = 0;
+    memcpy(&legacyProgressBits, &legacyProgress, sizeof(legacyProgress));
+    CGEventSetIntegerValueField(event, MMFCGFieldLegacyProgressBits, legacyProgressBits);
 
-    BOOL attached = MMFAttachDockSwipePayload(event);
-    MMFHIDEvent *hidEvent = MMFCopyExistingHIDEvent(event);
+    CGEventRef replacement = MMFCreateDockSwipeReplacement(event);
+    MMFHIDEvent *hidEvent = replacement ? MMFCopyExistingHIDEvent(replacement) : nil;
+    MMFHIDEvent *originalHIDEvent = MMFCopyExistingHIDEvent(event);
     double expectedProgress = MMFNormalizeLegacyDirection(progress, inverted);
     double expectedVelocity = MMFNormalizeLegacyDirection(velocityValue, inverted);
-    BOOL valid = attached
+    BOOL valid = replacement != NULL
+        && replacement != event
+        && CGEventGetType(replacement) == (CGEventType)30
+        && CGEventGetTimestamp(replacement) == eventTimestamp
+        && CGEventGetFlags(replacement) == expectedFlags
+        && CGPointEqualToPoint(CGEventGetLocation(replacement), expectedLocation)
         && hidEvent.type == MMFHIDEventTypeDockSwipe
         && MMFTimestampsEquivalent(hidEvent.timestamp, eventTimestamp)
         && ((hidEvent.options >> MMFHIDEventPhaseShift) & MMFHIDEventPhaseMask) == phase
@@ -310,7 +353,12 @@ static BOOL MMFRunSelfTestCase(NSInteger motion,
         && [hidEvent integerValueForField:MMFHIDFieldDockSwipeFlavor] == MMFHIDGestureFlavorDockPrimary
         // HID stores these values in fixed-point form, so allow its expected
         // quantization error when reading the payload back.
-        && fabs([hidEvent doubleValueForField:MMFHIDFieldDockSwipeProgress] - expectedProgress) < 0.0001;
+        && fabs([hidEvent doubleValueForField:MMFHIDFieldDockSwipeProgress] - expectedProgress) < 0.0001
+        // The replacement must be clean while the incoming event remains
+        // untouched. This catches the v0.3.0 mixed legacy/HID representation.
+        && CGEventGetIntegerValueField(replacement, MMFCGFieldLegacyProgressBits) == 0
+        && CGEventGetIntegerValueField(event, MMFCGFieldLegacyProgressBits) == legacyProgressBits
+        && originalHIDEvent == nil;
 
     BOOL needsVelocity = phase == MMFHIDEventPhaseEnded || phase == MMFHIDEventPhaseCancelled;
     if (needsVelocity) {
@@ -324,14 +372,20 @@ static BOOL MMFRunSelfTestCase(NSInteger motion,
         valid = valid && hidEvent.children.count == 0;
     }
 
-    // A delayed duplicate end-event should reuse its already attached payload.
-    BOOL idempotent = !MMFAttachDockSwipePayload(event);
+    // A replacement that crosses another copy of the companion must pass
+    // through unchanged because it already carries a Dock Swipe HID payload.
+    CGEventRef duplicateReplacement = replacement
+        ? MMFCreateDockSwipeReplacement(replacement)
+        : NULL;
+    BOOL idempotent = duplicateReplacement == NULL;
+    if (duplicateReplacement) CFRelease(duplicateReplacement);
     valid = valid && idempotent;
     if (!valid) {
         fprintf(stderr,
                 "self-test case failed: motion=%ld phase=%u type=%u options=%u "
                 "actualMotion=%ld flavor=%ld progress=%.6f timestamp=%llu "
-                "children=%lu idempotent=%d\n",
+                "cgTimestamp=%llu legacy135=%lld originalLegacy135=%lld "
+                "originalHID=%d distinct=%d children=%lu idempotent=%d\n",
                 (long)motion,
                 phase,
                 hidEvent.type,
@@ -340,9 +394,15 @@ static BOOL MMFRunSelfTestCase(NSInteger motion,
                 (long)[hidEvent integerValueForField:MMFHIDFieldDockSwipeFlavor],
                 [hidEvent doubleValueForField:MMFHIDFieldDockSwipeProgress],
                 hidEvent.timestamp,
+                replacement ? CGEventGetTimestamp(replacement) : 0,
+                replacement ? CGEventGetIntegerValueField(replacement, MMFCGFieldLegacyProgressBits) : -1,
+                CGEventGetIntegerValueField(event, MMFCGFieldLegacyProgressBits),
+                originalHIDEvent != nil,
+                replacement != event,
                 (unsigned long)hidEvent.children.count,
                 idempotent);
     }
+    if (replacement) CFRelease(replacement);
     CFRelease(event);
     return valid;
 }
@@ -396,12 +456,23 @@ static BOOL MMFRunSelfTest(NSError **error) {
     // the screen recording: inverted progress and velocity must both flip.
     valid = valid && MMFRunSelfTestCase(1, MMFHIDEventPhaseCancelled, -0.33, YES, -18.0, 1004);
     valid = valid && MMFRunSelfTestCase(2, MMFHIDEventPhaseEnded, 0.4, YES, 27.0, 1005);
+    // Issue #5 specifically affects the changed-phase frames of a vertical-up
+    // Mission Control gesture. Cover both legacy sign conventions because the
+    // incoming direction depends on the user's natural-scrolling setting.
+    valid = valid && MMFRunSelfTestCase(2, MMFHIDEventPhaseChanged, 0.61, NO, 0.0, 1006);
+    valid = valid && MMFRunSelfTestCase(2, MMFHIDEventPhaseChanged, -0.61, YES, 0.0, 1007);
 
     CGEventRef unrelated = CGEventCreate(NULL);
     CGEventSetType(unrelated, (CGEventType)30);
     CGEventSetIntegerValueField(unrelated, MMFCGFieldSubtype, 8);
-    valid = valid && !MMFAttachDockSwipePayload(unrelated);
+    valid = valid && MMFCreateDockSwipeReplacement(unrelated) == NULL;
     CFRelease(unrelated);
+
+    CGEventRef wrongType = CGEventCreate(NULL);
+    CGEventSetType(wrongType, (CGEventType)29);
+    CGEventSetIntegerValueField(wrongType, MMFCGFieldSubtype, MMFHIDEventTypeDockSwipe);
+    valid = valid && MMFCreateDockSwipeReplacement(wrongType) == NULL;
+    CFRelease(wrongType);
     valid = valid && MMFRunMenuBarPolicySelfTest();
 
     if (!valid && error) {
@@ -411,10 +482,12 @@ static BOOL MMFRunSelfTest(NSError **error) {
     return valid;
 }
 
-static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
-                                      CGEventType type,
-                                      CGEventRef event,
-                                      void *userInfo) {
+// CoreGraphics releases a newly returned callback event after forwarding it;
+// model that documented ownership transfer explicitly for the static analyzer.
+static CGEventRef CF_RETURNS_RETAINED MMFEventTapCallback(CGEventTapProxy proxy,
+                                                          CGEventType type,
+                                                          CGEventRef event,
+                                                          void *userInfo) {
     (void)proxy;
     (void)userInfo;
     if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
@@ -427,8 +500,8 @@ static CGEventRef MMFEventTapCallback(CGEventTapProxy proxy,
         }
         return event;
     }
-    MMFAttachDockSwipePayload(event);
-    return event;
+    CGEventRef replacement = MMFCreateDockSwipeReplacement(event);
+    return replacement ?: event;
 }
 
 @interface MMFAppDelegate : NSObject <NSApplicationDelegate, NSMenuDelegate>

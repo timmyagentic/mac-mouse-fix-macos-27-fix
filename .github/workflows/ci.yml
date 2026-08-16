@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install package metadata
+        run: npm ci --ignore-scripts
+
+      - name: Run portable tests
+        run: npm test
+
+      - name: Compile the native source with warnings as errors
+        run: |
+          for arch in arm64 x86_64; do
+            xcrun clang \
+              -arch "$arch" \
+              -fobjc-arc -fmodules \
+              -mmacosx-version-min=12.0 \
+              -Wall -Wextra -Werror \
+              -fsyntax-only src/main.m
+          done
+
+      - name: Verify package metadata and archive checksum
+        run: npm run verify-publish
+
+      - name: Verify the signed universal release app
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d "$RUNNER_TEMP/mmf27-ci.XXXXXX")"
+          archive="$(node --input-type=module -e 'import m from "./release-manifest.json" with { type: "json" }; process.stdout.write(m.archive)')"
+          /usr/bin/ditto -x -k "$archive" "$verify_dir"
+          app="$verify_dir/MMF27 Dock Swipe Fix.app"
+          executable="$app/Contents/MacOS/MMF27DockSwipeFix"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$app"
+          signature="$(/usr/bin/codesign -dv --verbose=4 "$app" 2>&1)"
+          grep -F "Identifier=local.timmy.mmf27-dock-swipe-fix" <<<"$signature"
+          grep -F "TeamIdentifier=4356B4HF9R" <<<"$signature"
+          grep -F "Authority=Developer ID Application: TINGJUN ZHOU (4356B4HF9R)" <<<"$signature"
+          architectures="$(/usr/bin/lipo -archs "$executable")"
+          [[ " $architectures " == *" arm64 "* ]]
+          [[ " $architectures " == *" x86_64 "* ]]
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          package_version="$(node --input-type=module -e 'import p from "./package.json" with { type: "json" }; process.stdout.write(p.version)')"
+          [[ "$version" == "$package_version" ]]

@@ -33,7 +33,16 @@ assert(
   manifest.releaseTag === `v${packageJSON.version}`,
   `Release tag ${manifest.releaseTag} does not match package ${packageJSON.version}`,
 );
-if (process.env.GITHUB_REF_NAME) {
+const isPrerelease = packageJSON.version.includes("-");
+const publishTag = packageJSON.publishConfig?.tag ?? "latest";
+const expectedPublishTag = isPrerelease
+  ? packageJSON.version.split("-", 2)[1].split(".", 1)[0]
+  : "latest";
+assert(
+  publishTag === expectedPublishTag,
+  `Package ${packageJSON.version} must use npm dist-tag ${expectedPublishTag} (received ${publishTag})`,
+);
+if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME) {
   assert(
     process.env.GITHUB_REF_NAME === manifest.releaseTag,
     `Workflow ref ${process.env.GITHUB_REF_NAME} does not match ${manifest.releaseTag}`,

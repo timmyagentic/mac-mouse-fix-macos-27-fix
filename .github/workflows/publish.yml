@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    if: ${{ !github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v') }}
+    if: ${{ startsWith(github.event.release.tag_name, 'v') }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
@@ -58,5 +58,20 @@ jobs:
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
           [[ "v$version" == "$GITHUB_REF_NAME" ]]
 
+      - name: Verify release channel
+        env:
+          RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          node --input-type=module <<'NODE'
+          import packageJSON from "./package.json" with { type: "json" };
+          const versionIsPrerelease = packageJSON.version.includes("-");
+          const releaseIsPrerelease = process.env.RELEASE_IS_PRERELEASE === "true";
+          if (versionIsPrerelease !== releaseIsPrerelease) {
+            throw new Error(`Release prerelease=${releaseIsPrerelease} does not match package ${packageJSON.version}`);
+          }
+          NODE
+
       - name: Publish with npm Trusted Publishing
-        run: npm publish --ignore-scripts --access public
+        run: |
+          publish_tag="$(node --input-type=module -e 'import p from "./package.json" with { type: "json" }; process.stdout.write(p.publishConfig?.tag ?? "latest")')"
+          npm publish --ignore-scripts --access public --tag "$publish_tag"
