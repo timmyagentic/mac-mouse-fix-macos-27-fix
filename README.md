@@ -4,12 +4,43 @@
 [![GitHub release](https://img.shields.io/github/v/release/timmyagentic/mac-mouse-fix-macos-27-fix)](https://github.com/timmyagentic/mac-mouse-fix-macos-27-fix/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-An unofficial, temporary companion repair for Mac Mouse Fix Dock Swipe gestures
+A legacy, unofficial companion repair for Mac Mouse Fix Dock Swipe gestures
 on macOS 27.
 
 [English](#english) · [中文](#中文)
 
+## Fixed upstream in 3.1.0 stable / 官方 3.1.0 稳定版已修复
+
+**Official Mac Mouse Fix 3.1.0 stable restores Spaces & Mission Control gestures
+on macOS 27.** See the [official release notes](https://github.com/noah-nuebling/mac-mouse-fix/releases/tag/3.1.0).
+This resolves the original gesture compatibility problem this companion was
+created for. Upgrade to official Mac Mouse Fix 3.1.0 or a newer stable version;
+**this companion is no longer needed for that fix**.
+
+If you already installed MMF27 Dock Swipe Fix, follow [Uninstall](#uninstall)
+after upgrading. Keep the official **Mac Mouse Fix** app and **Mac Mouse Fix
+Helper**. The instructions below remain available for older builds that still
+need the workaround.
+
+Remaining animation stutter or rebound after upgrading is a separate issue.
+The upstream compatibility fix does not establish that all animation issues are
+resolved, and this legacy companion should not be used as a fix for that stutter.
+
+**官方 Mac Mouse Fix 从 3.1.0 稳定版开始，已修复 macOS 27 上 Spaces／Mission
+Control 手势失效的问题。** 详见[官方发布说明](https://github.com/noah-nuebling/mac-mouse-fix/releases/tag/3.1.0)。
+这就是本修复器最初针对的兼容性问题。请优先升级到官方 3.1.0 或更新的稳定版，
+**不再需要安装本修复器来解决该问题**。
+
+已经安装的用户可以在升级后按[卸载说明](#卸载)移除 **MMF27 Dock Swipe Fix**。
+请保留官方 **Mac Mouse Fix** 应用及其 **Mac Mouse Fix Helper**。
+下文安装资料仅为仍需要此兼容方案的旧版本保留。
+
+升级后仍存在的动画卡顿或回弹，需要单独诊断。官方兼容性修复并不表示所有动画问题
+都已解决，也不应把这个旧修复器作为当前卡顿的解决方案。
+
 ## Install with an AI agent / 使用 AI Agent 安装
+
+For older Mac Mouse Fix builds only. / 仅适用于仍需要兼容修复的旧版 Mac Mouse Fix。
 
 Copy either prompt into Codex, Claude Code, Cursor, or another local coding
 agent. The agent can install and verify the app, but **you must personally
@@ -21,7 +52,11 @@ approve Accessibility permission in macOS System Settings**.
 ```text
 Install or update MMF27 Dock Swipe Fix from the official npm package. First
 verify that this Mac is running macOS 27 or later and that the official Mac
-Mouse Fix exists at /Applications/Mac Mouse Fix.app. Run
+Mouse Fix exists at /Applications/Mac Mouse Fix.app. Check its version first:
+if it is official 3.1.0 stable or a newer stable release, do not install this
+companion because the macOS 27 compatibility fix is already included. For an
+older build, recommend upgrading the official app first; only continue with
+this legacy installation if I need to keep the older build. Run
 `npm view mmf27-dock-swipe-fix version` and confirm it reports 0.3.0 or later.
 Then run:
 
@@ -49,7 +84,10 @@ icon after a short startup grace period; that is expected, not a failure.
 ```text
 请通过官方 npm 包安装或更新 MMF27 Dock Swipe Fix。先确认这台 Mac 运行的是
 macOS 27 或更高版本，并确认原版 Mac Mouse Fix 位于
-/Applications/Mac Mouse Fix.app。先运行 `npm view mmf27-dock-swipe-fix version`，
+/Applications/Mac Mouse Fix.app。先检查它的版本：如果是官方 3.1.0 稳定版或更新的
+稳定版，不要安装本修复器，因为官方已经包含 macOS 27 兼容性修复。对于旧版本，先
+建议升级官方应用；只有我需要保留旧版本时才继续安装此兼容方案。
+然后运行 `npm view mmf27-dock-swipe-fix version`，
 确认版本为 0.3.0 或更高版本，然后运行：
 
 npx --yes mmf27-dock-swipe-fix@latest install
@@ -70,10 +108,12 @@ service 和 runtime 是否健康，同时报告 menu_bar_mode 与 menu_bar_icon�
 
 > [!IMPORTANT]
 > This is an independent compatibility project. It is not affiliated with or
-> endorsed by Mac Mouse Fix or Apple. Remove it after Mac Mouse Fix ships an
-> official macOS 27 fix.
+> endorsed by Mac Mouse Fix or Apple. The official macOS 27 fix shipped in Mac
+> Mouse Fix 3.1.0 stable; remove this companion after upgrading.
 
 ## One-command install / 一行命令安装
+
+For older Mac Mouse Fix builds only. / 仅适用于仍需要兼容修复的旧版 Mac Mouse Fix。
 
 Requires Node.js 18.17 or later with npm. This command performs a persistent
 per-user installation—`npx` is only the explicit installer entry point.
@@ -117,10 +157,15 @@ npx --yes mmf27-dock-swipe-fix@latest uninstall
 
 ## English
 
+The original macOS 27 compatibility issue is fixed in official **Mac Mouse Fix
+3.1.0 stable**. [Upgrade the official app](https://github.com/noah-nuebling/mac-mouse-fix/releases/tag/3.1.0)
+and [uninstall this companion](#uninstall). The following documents the legacy
+workaround for older builds.
+
 ### What it fixes
 
-On macOS 27, Mac Mouse Fix can still recognize mouse buttons while its
-continuous system gestures stop responding. This companion restores the Dock
+On macOS 27, older Mac Mouse Fix builds can still recognize mouse buttons while
+their continuous system gestures stop responding. This companion restores the Dock
 Swipe event path used by:
 
 - Spaces & Mission Control
@@ -145,7 +190,7 @@ is available for users who prefer a permanent control surface.
 ### Requirements
 
 - macOS 27 or later
-- Mac Mouse Fix installed at
+- An older Mac Mouse Fix build without the upstream fix, installed at
   `/Applications/Mac Mouse Fix.app`
 - Accessibility permission for **MMF27 Dock Swipe Fix**
 - For the recommended npm installer: Node.js 18.17 or later with npm
@@ -372,9 +417,10 @@ carry a macOS 27 HID payload, the companion reconstructs the Dock Swipe
 motion/phase/progress/velocity data and attaches it through
 `SLEventSetIOHIDEvent`.
 
-Events outside that narrow scope pass through unchanged. If a future Mac Mouse
-Fix build already attaches the expected HID payload, the companion leaves that
-event alone.
+Events outside that narrow scope pass through unchanged. Events that already
+carry the expected HID payload also pass through unchanged. Official Mac Mouse
+Fix 3.1.0 stable includes the macOS 27 compatibility fix, so this companion is
+no longer needed with that version.
 
 ### Security and privacy
 
@@ -404,9 +450,12 @@ Publisher must remain bound to `timmyagentic/mac-mouse-fix-macos-27-fix` and
 
 ### Compatibility
 
-Designed and self-tested on macOS 27 with Mac Mouse Fix 3.1.0 Beta 1. Mac Mouse
-Fix 3.0.x uses the same legacy Dock Swipe event fields, but not every version and
-mouse model has been independently tested.
+Official Mac Mouse Fix **3.1.0 stable** fixes the original compatibility issue;
+use the official app without this companion.
+
+The legacy workaround was designed and self-tested on macOS 27 with Mac Mouse
+Fix 3.1.0 Beta 1. Mac Mouse Fix 3.0.x uses the same legacy Dock Swipe event fields,
+but not every version and mouse model has been independently tested.
 
 ### Related upstream work
 
@@ -429,9 +478,13 @@ unstable, hard-coded `CGEvent` offsets.
 
 ## 中文
 
+官方 **Mac Mouse Fix 3.1.0 稳定版**已经修复原来的 macOS 27 手势兼容问题。
+请[升级官方应用](https://github.com/noah-nuebling/mac-mouse-fix/releases/tag/3.1.0)，
+并[卸载本修复器](#卸载)。以下内容为旧版本保留。
+
 ### 这个项目修复什么
 
-在 macOS 27 上，Mac Mouse Fix 仍然可以识别鼠标按键，但一些连续系统手势会完全
+在 macOS 27 上，旧版 Mac Mouse Fix 仍然可以识别鼠标按键，但一些连续系统手势会完全
 失效。这个伴随程序用于恢复以下 Dock Swipe 功能：
 
 - 空间与调度中心（Spaces & Mission Control）
@@ -452,7 +505,7 @@ unstable, hard-coded `CGEvent` offsets.
 ### 使用要求
 
 - macOS 27 或更高版本
-- 已安装 Mac Mouse Fix，并且它位于
+- 已安装尚未包含官方兼容性修复的旧版 Mac Mouse Fix，并且它位于
   `/Applications/Mac Mouse Fix.app`
 - 给 **MMF27 Dock Swipe Fix** 授予“辅助功能”权限
 - 如果使用推荐的 npm 安装方式，需要 Node.js 18.17 或更高版本以及 npm
@@ -660,8 +713,9 @@ Mac Mouse Fix 没有插件 API，因此这个项目采用一个拥有独立辅�
 事件还没有携带 macOS 27 需要的 HID 数据，程序会重建 motion、phase、progress 和
 velocity，并通过 `SLEventSetIOHIDEvent` 附加到原事件。
 
-其他事件会原样通过。如果未来的 Mac Mouse Fix 已经附加了正确 HID 数据，这个程序
-也会跳过该事件。
+其他事件会原样通过；已经携带正确 HID 数据的事件也会原样通过。
+官方 Mac Mouse Fix 3.1.0 稳定版已包含 macOS 27 兼容性修复，因此该版本不再需要
+这个伴随程序。
 
 ### 安全与隐私
 
@@ -686,8 +740,11 @@ Publisher 设置必须继续绑定 `timmyagentic/mac-mouse-fix-macos-27-fix` 和
 
 ### 兼容性
 
-已针对 macOS 27 和 Mac Mouse Fix 3.1.0 Beta 1 设计并完成自测。Mac Mouse Fix
-3.0.x 使用相同的旧版 Dock Swipe 事件字段，但并非每个版本和鼠标型号都经过独立测试。
+官方 **Mac Mouse Fix 3.1.0 稳定版**已修复原始兼容性问题，使用官方应用即可。
+
+旧版兼容方案曾针对 macOS 27 和 Mac Mouse Fix 3.1.0 Beta 1 设计并完成自测。
+Mac Mouse Fix 3.0.x 使用相同的旧版 Dock Swipe 事件字段，但并非每个版本和鼠标型号
+都经过独立测试。
 
 ### 相关上游工作
 
